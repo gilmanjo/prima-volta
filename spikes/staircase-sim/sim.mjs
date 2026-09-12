@@ -88,9 +88,11 @@ for (let i = 1; i < full.length; i++) {
   for (let j = i + ACT_AT; j < Math.min(i + ACT_AT + 4, full.length); j++) if (full[j].mean != null) { troughs.push(full[j].mean); break; }
 }
 const mean = a => a.reduce((x, y) => x + y, 0) / (a.length || 1);
-console.log(`\nstep-size probe: observed sawtooth ≈ ${mean(troughs).toFixed(1)} → ${mean(peaks).toFixed(1)} at STEP=${STEP}.`
-  + ` 03 §1.4's prose says ~87–97, which needs STEP≈8–10 — but the anti-flapping invariant requires STEP < the 10-pt hold band.`
-  + ` Try: node spikes/staircase-sim/sim.mjs --step 8   (expect flapper ✗) — the empirical reconciliation 05 §5 asks for.`);
+const cleans = full.filter(d => d).slice(10).map(d => d.clean).sort((a, b) => a - b);
+const pct = q => cleans[Math.floor(q * (cleans.length - 1))];
+console.log(`\nstep-size probe at STEP=${STEP}: the controller's rolling-mean sawtooth ≈ ${mean(troughs).toFixed(1)} → ${mean(peaks).toFixed(1)};`
+  + ` per-read clean spans ${pct(0.05).toFixed(0)}–${pct(0.95).toFixed(0)} (p5–p95).`
+  + ` Two statistics, one behavior: 03 §1.4's "~87–97" describes the per-read experience; the bands act on the tighter rolling mean.`);
 
 let fail = 0;
 for (const [name, ok] of v) { console.log(`${ok ? "✓" : "✗"} ${name}`); if (!ok) fail++; }

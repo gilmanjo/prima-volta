@@ -9,3 +9,4 @@ coverage/
 .env.*
 .dev.vars
 .DS_Store
+spikes/*/results/

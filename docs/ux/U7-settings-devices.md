@@ -7,7 +7,7 @@ Three sections — devices, drill scope (the largest settings surface in the app
 ## Devices & calibration
 
 - **Profile list** (03 §3): one row per keyboard × transport ("FP-30X · USB", "FP-30X · BLE", "FP-90X · USB") with measured latency offset and jitter readouts (Spline Mono), a trust chip (USB: performance-trusted · BLE: rehearsal-trusted), and last-calibrated date.
-- **Calibration ritual** (~20s flow): play along with 8 clicks → progress ring → result card (median offset, spread) → saved to the profile. Re-run any time; a stale profile triggers the bout-open spot-check (08 §6).
+- **Calibration ritual** (~25s flow): four count-in clicks (low tone), then eight scored (high) → progress ring → result card (median offset, spread; anticipations dropped) → saved to the profile. Re-run any time; a stale profile triggers the bout-open spot-check (08 §6).
 - **BLE messaging:** entering a performance read on a jittery BLE profile shows a one-line warning ("timing windows widened — USB is tighter"), never a block.
 - **The profile principle, surfaced:** one calm sentence in this section — "device settings live in the profile; switching or fixing a profile never touches your history" (03 §3).
 

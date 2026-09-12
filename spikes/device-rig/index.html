@@ -28,8 +28,8 @@
 </section>
 
 <section>
-  <h2>1 · Latency &amp; jitter — the 8-click ritual (03 §3)</h2>
-  <p>Press <b>any key exactly on each click</b>. 8 clicks at ♩=100. The median offset becomes the profile's latency correction; the spread is its jitter.</p>
+  <h2>1 · Latency &amp; jitter — the calibration ritual (03 §3)</h2>
+  <p><b>Four count-in clicks (low tone) to entrain, then eight scored clicks (high tone)</b> — press any key exactly on each high click. Anticipation outliers are dropped; the median offset becomes the profile's latency correction, the spread its jitter.</p>
   <button id="calStart">Start the ritual</button><span id="calStat" class="stat"></span>
   <div class="log" id="calLog"></div>
 </section>
@@ -81,9 +81,9 @@ navigator.requestMIDIAccess?.().then(m => {
 
 // audio click
 const AC = new (window.AudioContext || window.webkitAudioContext)();
-function click(atAudioTime) {
+function click(atAudioTime, freq = 1200) {
   const o = AC.createOscillator(), g = AC.createGain();
-  o.frequency.value = 1200; o.connect(g); g.connect(AC.destination);
+  o.frequency.value = freq; o.connect(g); g.connect(AC.destination);
   g.gain.setValueAtTime(0.6, atAudioTime); g.gain.exponentialRampToValueAtTime(0.001, atAudioTime + 0.05);
   o.start(atAudioTime); o.stop(atAudioTime + 0.06);
 }
@@ -93,25 +93,29 @@ const spread = a => { const s = [...a].sort((x, y) => x - y); return s.length > 
 // 1 · calibration
 $("calStart").onclick = async () => {
   await AC.resume();
-  $("calStart").disabled = true; $("calStat").textContent = "listen…";
-  const N = 8, iv = 0.6, t0 = AC.currentTime + 1;
-  const clickPerf = [];
+  $("calStart").disabled = true; $("calStat").textContent = "count-in…";
+  const COUNT = 4, N = 8, iv = 0.6, t0 = AC.currentTime + 1;
   const perfPerAudio = performance.now() - AC.currentTime * 1000; // map audio clock → performance clock
-  for (let k = 0; k < N; k++) { click(t0 + k * iv); clickPerf.push((t0 + k * iv) * 1000 + perfPerAudio); }
+  for (let k = 0; k < COUNT; k++) click(t0 + k * iv, 800);           // count-in: low tone, unscored
+  const s0 = t0 + COUNT * iv;
+  const clickPerf = [];
+  for (let k = 0; k < N; k++) { click(s0 + k * iv, 1200); clickPerf.push((s0 + k * iv) * 1000 + perfPerAudio); }
   const hits = [];
   onNote = n => hits.push(n);
   setTimeout(() => {
     onNote = null;
-    const offsets = clickPerf.map(ct => {
+    const raw = clickPerf.map(ct => {
       let best = null; for (const h of hits) { const d = h.t - ct; if (d > -250 && d < 350 && (best === null || Math.abs(d) < Math.abs(best))) best = d; }
       return best;
     }).filter(o => o !== null);
-    const run = { offsets: offsets.map(o => +o.toFixed(1)), median: +median(offsets).toFixed(1), spread: +spread(offsets).toFixed(1), hits: hits.length };
+    const kept = raw.filter(o => Math.abs(o) <= 150);                // drop anticipation outliers
+    const run = { offsets: kept.map(o => +o.toFixed(1)), droppedOutliers: raw.length - kept.length,
+      median: +median(kept).toFixed(1), spread: +spread(kept).toFixed(1), matched: raw.length, of: N };
     results.calibration.push(run);
-    $("calStat").textContent = ` median ${run.median} ms · spread ${run.spread} ms (${offsets.length}/${N} matched)`;
+    $("calStat").textContent = ` median ${run.median} ms · spread ${run.spread} ms (${raw.length}/${N} matched${run.droppedOutliers ? `, ${run.droppedOutliers} dropped` : ""})`;
     $("calLog").textContent = JSON.stringify(results.calibration, null, 1);
     $("calStart").disabled = false;
-  }, (1 + N * iv + 0.6) * 1000);
+  }, (1 + (COUNT + N) * iv + 0.6) * 1000);
 };
 
 // 2 · velocity floor
