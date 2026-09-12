@@ -122,6 +122,6 @@ Durations/legato, articulation, dynamics/velocity, pedal, fingering (invisible t
 
 ## Open questions
 
-None standing. Two empirical constants are **parked for the FP-30X spike**: the hesitation threshold (IOI > 2× local median stands as the working proposal) and the velocity floor for key brushes — the floor is a **device-profile value** per §3's profile principle, so tuning or re-tuning it never touches review data.
+None standing. Two empirical constants are **parked for the device spike** (the rig runs per keyboard × transport; the **FP-90X · USB** profile — the practice instrument — is the load-bearing session, with the desk FP-30X as the rig bench, the BLE comparison, and a cross-device consistency check): the hesitation threshold (IOI > 2× local median stands as the working proposal) and the velocity floor for key brushes — the floor is a **device-profile value** per §3's profile principle, so tuning or re-tuning it never touches review data.
 
 *(Staircase feeding is settled in 05 §3: tag-filtered pitch axes fed by both modes, rhythm by performance + F7, continuity never.)*

@@ -144,7 +144,7 @@ src/jobs/        calibration-fit · prescriptions+coach-note · outcomes      (W
 seed/            the seeder and its outputs (catalog.json, constants.json — §4)
 sim/             the simulation harness + personas + trace/summary assertions (13) — dev-time only:
                  imported by tests, never by src/, never in the bundle
-spikes/          measurement instruments (the harness in its spike life, the FP-30X latency rig) —
+spikes/          measurement instruments (the harness in its spike life, the device rig) —
                  local-only, never deployed, never imported by src/ (ground rule 2; 13 §8)
 ```
 
@@ -251,7 +251,7 @@ The server is deliberately tiny: `/api/sync` (§5), the cron jobs, and one paper
 |---|---|
 | **Android Chrome** (phone, landscape at the instrument) | Primary player target (11's landscape-first rules) |
 | **ChromeOS Chrome** (Chromebook) | Second at-instrument target; same layouts with more air |
-| **Windows desktop** | Development + desk FP-30X testing |
+| **Windows desktop** | Development + the desk FP-30X spike bench (real practice lives on the living-room FP-90X) |
 | **iOS / iPadOS** | No Web MIDI → **knowledge-only mode** (08 §7), permanently; recognition drills work fine |
 
 **PWA: yes (decided — cheap and it earns its keep at the piano).** Installable manifest; service worker precaches the app shell, `catalog.json` + `constants.json`, the UI soundfont, and a mid-register subset of the replay samples (a few MB — enough for reconciliation playback offline; full sample quality streams when online). Combined with §5's replica, an installed phone practices fully offline. No push notifications — nothing in the design nags, so nothing needs the permission.

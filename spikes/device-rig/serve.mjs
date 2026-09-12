@@ -1,5 +1,7 @@
 // Tiny static server for the rig (Web MIDI needs a secure context; localhost qualifies).
-// Usage: node spikes/fp30x-rig/serve.mjs  → open http://localhost:8477
+// Usage: node spikes/device-rig/serve.mjs  → open http://localhost:8477
+// At the living-room FP-90X, skip the server: open the GitHub Pages copy on the phone instead
+// (https://gilmanjo.github.io/prima-volta/spikes/device-rig/ — HTTPS = secure context).
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";

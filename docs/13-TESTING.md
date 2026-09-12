@@ -62,7 +62,7 @@ Each persona is a parameter file (learning rates, error biases by tag/family, la
 | **The weekender / the binger** | Step ripening, interleave and confusable guards under lumpy schedules |
 | **The ideal student** | The ceiling sanity run: nothing pathological at the top; SSS+++ is reachable |
 
-Parameters are pre-spike guesses; the FP-30X spike's measured error/latency distributions retune them, and live logs retune them again. Personas version like constants — a retune regenerates goldens deliberately (§6).
+Parameters are pre-spike guesses; the device spike's measured error/latency distributions (FP-90X · USB load-bearing) retune them, and live logs retune them again. Personas version like constants — a retune regenerates goldens deliberately (§6).
 
 ## 4. Observables — the trace
 
@@ -122,7 +122,7 @@ The pre-code tuning runs 05 §5 already owns: band-edge sweeps, the step-size pr
 
 ## 9. What this deliberately does not test
 
-The pedagogy (L5 and real practice own truth); UI rendering beyond 10 §9's scripted-MIDI player smoke; VexFlow/tonal internals; real-device timing (the FP-30X spike owns reality); the Claude composer (tabled — its contract suite sleeps with it).
+The pedagogy (L5 and real practice own truth); UI rendering beyond 10 §9's scripted-MIDI player smoke; VexFlow/tonal internals; real-device timing (the device spike owns reality); the Claude composer (tabled — its contract suite sleeps with it).
 
 ## Open questions
 
