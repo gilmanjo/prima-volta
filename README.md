@@ -4,6 +4,8 @@
 
 **Status: docs-complete, implementation at Phase 0.** This project was designed docs-before-code: the entire app is specified in [docs/](docs/README.md) — fourteen documents, all adjudicated — before any product code. The [decision log](docs/00-OVERVIEW.md#decision-log) is the dated record of every design ruling; the docs themselves carry no edit history by rule.
 
+**View it rendered:** the mockups and figures are self-contained HTML, served live via GitHub Pages — [design figures](https://gilmanjo.github.io/prima-volta/docs/figures/figures.html) · [exercise mockups F1–F11](https://gilmanjo.github.io/prima-volta/docs/catalog/mockups/F4-chords.html) · [UX surfaces U1–U8](https://gilmanjo.github.io/prima-volta/docs/ux/mockups/U1-strength-map.html) — or browse the [PNG snapshot gallery](docs/snapshots/README.md) inline on GitHub.
+
 - **[docs/](docs/README.md)** — the design suite (00 overview → 13 testing), with reading order and status
 - **[docs/figures/](docs/figures/figures.html)** — concept diagrams + outcome charts computed by seeded mini-simulations of the documented mechanics
 - **[docs/catalog/mockups/](docs/catalog/README.md)** and **docs/ux/mockups/** — self-contained HTML mockups of every exercise and surface
