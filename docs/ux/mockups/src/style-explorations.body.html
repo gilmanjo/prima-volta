@@ -1,0 +1,197 @@
+<!-- Style explorations — accent color candidates · Prima Volta -->
+<style>
+  .ex { --acc: #c9a227; --acc-hi: #dcb954; --acc-ink: #171308; --acc-soft: rgba(201,162,39,0.10); --acc-line: rgba(201,162,39,0.45); }
+  .ex.felt { --acc: #b23a33; --acc-hi: #d0584e; --acc-ink: #1c0908; --acc-soft: rgba(178,58,51,0.10); --acc-line: rgba(178,58,51,0.5); }
+  .ex.verd { --acc: #4e9c8a; --acc-hi: #6fc0ab; --acc-ink: #0d1f1a; --acc-soft: rgba(78,156,138,0.10); --acc-line: rgba(78,156,138,0.5); }
+  .ex.rose { --acc: #b06a3f; --acc-hi: #d08a57; --acc-ink: #201008; --acc-soft: rgba(176,106,63,0.10); --acc-line: rgba(176,106,63,0.5); }
+  .ex.grn  { --acc: #3d8a5b; --acc-hi: #63b285; --acc-ink: #0a1f12; --acc-soft: rgba(61,138,91,0.10);  --acc-line: rgba(61,138,91,0.5); }
+  .ex.cel  { --acc: #7c9d87; --acc-hi: #a2c3ab; --acc-ink: #14201a; --acc-soft: rgba(124,157,135,0.10); --acc-line: rgba(124,157,135,0.5); }
+  .ex.cob  { --acc: #4272c4; --acc-hi: #6f9bde; --acc-ink: #0a1226; --acc-soft: rgba(66,114,196,0.12);  --acc-line: rgba(66,114,196,0.55); }
+  .ex.slt  { --acc: #5b7fa6; --acc-hi: #82a6cb; --acc-ink: #0e1826; --acc-soft: rgba(91,127,166,0.12);  --acc-line: rgba(91,127,166,0.5); }
+
+  .ex .chip.lg { color: var(--acc-hi); border-color: var(--acc-line); background: var(--acc-soft); }
+  .ex .rankchip .up { color: var(--acc-hi); }
+  .ex .rxcard { border-color: var(--acc-line); background: linear-gradient(180deg, #26262a, #1e1e22); }
+  .ex .rxcard .acts span { color: var(--acc-hi); }
+  .ex .rxcard .acts span.no { color: var(--faint); }
+  .ex .famrow .meta.hot { color: var(--ivory); }
+  .ex .btn.primary { background: linear-gradient(180deg, var(--acc-hi), var(--acc)); border-color: var(--acc); color: var(--acc-ink); box-shadow: 0 4px 14px var(--acc-soft), inset 0 1px 0 rgba(255,255,255,0.3); }
+  .ex .tabbar span.on { color: var(--acc-hi); }
+  .ex .tabbar span.on i { background: var(--acc); box-shadow: 0 0 8px var(--acc-line); }
+  .ex .streakon { color: var(--acc-hi); }
+  .swatches { display: flex; gap: 6px; margin: 0 0 8px; }
+  .swatches i { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line); }
+</style>
+
+<header class="page">
+  <h1>Style explorations <span style="color:var(--muted)">— the accent, on the real home screen</span></h1>
+  <p>Ebony stays; the accent is the question. Four candidates on the identical U1 layout — brass is the incumbent ("stock AI-app" risk noted), the other three trade yellow for other piano-adjacent materials. Type, spacing, and components are constant; only the accent changes.</p>
+</header>
+
+<div class="grouphead">Candidates <small>same screen · four accents</small></div>
+<div class="row">
+
+<figure class="ex">
+  <div class="swatches"><i style="background:#c9a227"></i><i style="background:#dcb954"></i></div>
+  <div class="phone">
+    <div class="statusrow"><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="hdrstrip"><span class="streak">day 12</span><span class="chip lg">Gold II · 862</span></div>
+    <div class="axischips"><span class="rankchip">keys <b>A--</b> <span class="up">▲</span></span><span class="rankchip">rhythm <b>C+</b> <span class="up">▲</span></span><span class="rankchip">range <b>B+</b></span><span class="rankchip">span <b>D++</b></span></div>
+    <div class="shelf"><div class="rxcard"><div class="t">Sevenths in flat keys</div><div class="ev">chord-tone:7th deletions at 3× baseline</div><div class="acts"><span>Accept</span><span class="no">Decline</span></div></div></div>
+    <div class="famcol">
+      <div class="famrow"><span class="nm">Keys &amp; signatures</span><span class="sub">instant key ↔ signature recall</span><span class="meta">3 weak</span></div>
+      <div class="famrow"><span class="nm">Chords</span><span class="sub">grab any chord instantly</span><span class="meta hot">31 weak</span></div>
+      <div class="famrow"><span class="nm">Scales</span><span class="sub">keys under the fingers, at tempo</span><span class="meta">6 weak</span></div>
+      <div class="famrow"><span class="nm">Rhythm</span><span class="sub">decode and keep the pulse</span><span class="meta">4 weak</span></div>
+      <div class="famrow"><span class="nm">Passages</span><span class="sub">sight-read fresh music</span><span class="meta">read →</span></div>
+    </div>
+    <div class="footerbar"><div class="btn primary">Practice</div></div>
+    <div class="tabbar"><span class="on"><i></i>Practice</span><span><i></i>Ratings</span><span><i></i>Library</span><span><i></i>Settings</span></div>
+  </div>
+  <figcaption><b>Brass</b> — the incumbent. Warm, legible; also the default "dark AI app" look.</figcaption>
+</figure>
+
+<figure class="ex felt">
+  <div class="swatches"><i style="background:#b23a33"></i><i style="background:#d0584e"></i></div>
+  <div class="phone">
+    <div class="statusrow"><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="hdrstrip"><span class="streak">day 12</span><span class="chip lg">Gold II · 862</span></div>
+    <div class="axischips"><span class="rankchip">keys <b>A--</b> <span class="up">▲</span></span><span class="rankchip">rhythm <b>C+</b> <span class="up">▲</span></span><span class="rankchip">range <b>B+</b></span><span class="rankchip">span <b>D++</b></span></div>
+    <div class="shelf"><div class="rxcard"><div class="t">Sevenths in flat keys</div><div class="ev">chord-tone:7th deletions at 3× baseline</div><div class="acts"><span>Accept</span><span class="no">Decline</span></div></div></div>
+    <div class="famcol">
+      <div class="famrow"><span class="nm">Keys &amp; signatures</span><span class="sub">instant key ↔ signature recall</span><span class="meta">3 weak</span></div>
+      <div class="famrow"><span class="nm">Chords</span><span class="sub">grab any chord instantly</span><span class="meta hot">31 weak</span></div>
+      <div class="famrow"><span class="nm">Scales</span><span class="sub">keys under the fingers, at tempo</span><span class="meta">6 weak</span></div>
+      <div class="famrow"><span class="nm">Rhythm</span><span class="sub">decode and keep the pulse</span><span class="meta">4 weak</span></div>
+      <div class="famrow"><span class="nm">Passages</span><span class="sub">sight-read fresh music</span><span class="meta">read →</span></div>
+    </div>
+    <div class="footerbar"><div class="btn primary">Practice</div></div>
+    <div class="tabbar"><span class="on"><i></i>Practice</span><span><i></i>Ratings</span><span><i></i>Library</span><span><i></i>Settings</span></div>
+  </div>
+  <figcaption><b>Felt</b> — the red under every piano lid. Rich and unmistakably piano; error states would shift to a hotter scarlet to stay distinct.</figcaption>
+</figure>
+
+<figure class="ex verd">
+  <div class="swatches"><i style="background:#4e9c8a"></i><i style="background:#6fc0ab"></i></div>
+  <div class="phone">
+    <div class="statusrow"><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="hdrstrip"><span class="streak">day 12</span><span class="chip lg">Gold II · 862</span></div>
+    <div class="axischips"><span class="rankchip">keys <b>A--</b> <span class="up">▲</span></span><span class="rankchip">rhythm <b>C+</b> <span class="up">▲</span></span><span class="rankchip">range <b>B+</b></span><span class="rankchip">span <b>D++</b></span></div>
+    <div class="shelf"><div class="rxcard"><div class="t">Sevenths in flat keys</div><div class="ev">chord-tone:7th deletions at 3× baseline</div><div class="acts"><span>Accept</span><span class="no">Decline</span></div></div></div>
+    <div class="famcol">
+      <div class="famrow"><span class="nm">Keys &amp; signatures</span><span class="sub">instant key ↔ signature recall</span><span class="meta">3 weak</span></div>
+      <div class="famrow"><span class="nm">Chords</span><span class="sub">grab any chord instantly</span><span class="meta hot">31 weak</span></div>
+      <div class="famrow"><span class="nm">Scales</span><span class="sub">keys under the fingers, at tempo</span><span class="meta">6 weak</span></div>
+      <div class="famrow"><span class="nm">Rhythm</span><span class="sub">decode and keep the pulse</span><span class="meta">4 weak</span></div>
+      <div class="famrow"><span class="nm">Passages</span><span class="sub">sight-read fresh music</span><span class="meta">read →</span></div>
+    </div>
+    <div class="footerbar"><div class="btn primary">Practice</div></div>
+    <div class="tabbar"><span class="on"><i></i>Practice</span><span><i></i>Ratings</span><span><i></i>Library</span><span><i></i>Settings</span></div>
+  </div>
+  <figcaption><b>Verdigris</b> — patinated bronze, the green of old instrument hardware. Calm, distinctive, nothing else looks like it.</figcaption>
+</figure>
+
+<figure class="ex rose">
+  <div class="swatches"><i style="background:#b06a3f"></i><i style="background:#d08a57"></i></div>
+  <div class="phone">
+    <div class="statusrow"><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="hdrstrip"><span class="streak">day 12</span><span class="chip lg">Gold II · 862</span></div>
+    <div class="axischips"><span class="rankchip">keys <b>A--</b> <span class="up">▲</span></span><span class="rankchip">rhythm <b>C+</b> <span class="up">▲</span></span><span class="rankchip">range <b>B+</b></span><span class="rankchip">span <b>D++</b></span></div>
+    <div class="shelf"><div class="rxcard"><div class="t">Sevenths in flat keys</div><div class="ev">chord-tone:7th deletions at 3× baseline</div><div class="acts"><span>Accept</span><span class="no">Decline</span></div></div></div>
+    <div class="famcol">
+      <div class="famrow"><span class="nm">Keys &amp; signatures</span><span class="sub">instant key ↔ signature recall</span><span class="meta">3 weak</span></div>
+      <div class="famrow"><span class="nm">Chords</span><span class="sub">grab any chord instantly</span><span class="meta hot">31 weak</span></div>
+      <div class="famrow"><span class="nm">Scales</span><span class="sub">keys under the fingers, at tempo</span><span class="meta">6 weak</span></div>
+      <div class="famrow"><span class="nm">Rhythm</span><span class="sub">decode and keep the pulse</span><span class="meta">4 weak</span></div>
+      <div class="famrow"><span class="nm">Passages</span><span class="sub">sight-read fresh music</span><span class="meta">read →</span></div>
+    </div>
+    <div class="footerbar"><div class="btn primary">Practice</div></div>
+    <div class="tabbar"><span class="on"><i></i>Practice</span><span><i></i>Ratings</span><span><i></i>Library</span><span><i></i>Settings</span></div>
+  </div>
+  <figcaption><b>Rosewood copper</b> — fallboard wood and copper strings. Warm like brass but browner, off the beaten AI path.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">Greens &amp; blues <small>saturated ↔ muted, per hue</small></div>
+<div class="row">
+
+<figure class="ex grn">
+  <div class="swatches"><i style="background:#3d8a5b"></i><i style="background:#63b285"></i></div>
+  <div class="phone">
+    <div class="statusrow"><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="hdrstrip"><span class="streak">day 12</span><span class="chip lg">Gold II · 862</span></div>
+    <div class="axischips"><span class="rankchip">keys <b>A--</b> <span class="up">▲</span></span><span class="rankchip">rhythm <b>C+</b> <span class="up">▲</span></span><span class="rankchip">range <b>B+</b></span><span class="rankchip">span <b>D++</b></span></div>
+    <div class="shelf"><div class="rxcard"><div class="t">Sevenths in flat keys</div><div class="ev">chord-tone:7th deletions at 3× baseline</div><div class="acts"><span>Accept</span><span class="no">Decline</span></div></div></div>
+    <div class="famcol">
+      <div class="famrow"><span class="nm">Keys &amp; signatures</span><span class="sub">instant key ↔ signature recall</span><span class="meta">3 weak</span></div>
+      <div class="famrow"><span class="nm">Chords</span><span class="sub">grab any chord instantly</span><span class="meta hot">31 weak</span></div>
+      <div class="famrow"><span class="nm">Scales</span><span class="sub">keys under the fingers, at tempo</span><span class="meta">6 weak</span></div>
+      <div class="famrow"><span class="nm">Rhythm</span><span class="sub">decode and keep the pulse</span><span class="meta">4 weak</span></div>
+      <div class="famrow"><span class="nm">Passages</span><span class="sub">sight-read fresh music</span><span class="meta">read →</span></div>
+    </div>
+    <div class="footerbar"><div class="btn primary">Practice</div></div>
+    <div class="tabbar"><span class="on"><i></i>Practice</span><span><i></i>Ratings</span><span><i></i>Library</span><span><i></i>Settings</span></div>
+  </div>
+  <figcaption><b>Felt green</b> — card-table felt, saturated. Confident and calm; pairs naturally with the ivory type.</figcaption>
+</figure>
+
+<figure class="ex cel">
+  <div class="swatches"><i style="background:#7c9d87"></i><i style="background:#a2c3ab"></i></div>
+  <div class="phone">
+    <div class="statusrow"><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="hdrstrip"><span class="streak">day 12</span><span class="chip lg">Gold II · 862</span></div>
+    <div class="axischips"><span class="rankchip">keys <b>A--</b> <span class="up">▲</span></span><span class="rankchip">rhythm <b>C+</b> <span class="up">▲</span></span><span class="rankchip">range <b>B+</b></span><span class="rankchip">span <b>D++</b></span></div>
+    <div class="shelf"><div class="rxcard"><div class="t">Sevenths in flat keys</div><div class="ev">chord-tone:7th deletions at 3× baseline</div><div class="acts"><span>Accept</span><span class="no">Decline</span></div></div></div>
+    <div class="famcol">
+      <div class="famrow"><span class="nm">Keys &amp; signatures</span><span class="sub">instant key ↔ signature recall</span><span class="meta">3 weak</span></div>
+      <div class="famrow"><span class="nm">Chords</span><span class="sub">grab any chord instantly</span><span class="meta hot">31 weak</span></div>
+      <div class="famrow"><span class="nm">Scales</span><span class="sub">keys under the fingers, at tempo</span><span class="meta">6 weak</span></div>
+      <div class="famrow"><span class="nm">Rhythm</span><span class="sub">decode and keep the pulse</span><span class="meta">4 weak</span></div>
+      <div class="famrow"><span class="nm">Passages</span><span class="sub">sight-read fresh music</span><span class="meta">read →</span></div>
+    </div>
+    <div class="footerbar"><div class="btn primary">Practice</div></div>
+    <div class="tabbar"><span class="on"><i></i>Practice</span><span><i></i>Ratings</span><span><i></i>Library</span><span><i></i>Settings</span></div>
+  </div>
+  <figcaption><b>Celadon</b> — muted sage-green, the quietest of the set. Recedes politely; the music stays the loudest thing on screen.</figcaption>
+</figure>
+
+<figure class="ex cob">
+  <div class="swatches"><i style="background:#4272c4"></i><i style="background:#6f9bde"></i></div>
+  <div class="phone">
+    <div class="statusrow"><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="hdrstrip"><span class="streak">day 12</span><span class="chip lg">Gold II · 862</span></div>
+    <div class="axischips"><span class="rankchip">keys <b>A--</b> <span class="up">▲</span></span><span class="rankchip">rhythm <b>C+</b> <span class="up">▲</span></span><span class="rankchip">range <b>B+</b></span><span class="rankchip">span <b>D++</b></span></div>
+    <div class="shelf"><div class="rxcard"><div class="t">Sevenths in flat keys</div><div class="ev">chord-tone:7th deletions at 3× baseline</div><div class="acts"><span>Accept</span><span class="no">Decline</span></div></div></div>
+    <div class="famcol">
+      <div class="famrow"><span class="nm">Keys &amp; signatures</span><span class="sub">instant key ↔ signature recall</span><span class="meta">3 weak</span></div>
+      <div class="famrow"><span class="nm">Chords</span><span class="sub">grab any chord instantly</span><span class="meta hot">31 weak</span></div>
+      <div class="famrow"><span class="nm">Scales</span><span class="sub">keys under the fingers, at tempo</span><span class="meta">6 weak</span></div>
+      <div class="famrow"><span class="nm">Rhythm</span><span class="sub">decode and keep the pulse</span><span class="meta">4 weak</span></div>
+      <div class="famrow"><span class="nm">Passages</span><span class="sub">sight-read fresh music</span><span class="meta">read →</span></div>
+    </div>
+    <div class="footerbar"><div class="btn primary">Practice</div></div>
+    <div class="tabbar"><span class="on"><i></i>Practice</span><span><i></i>Ratings</span><span><i></i>Library</span><span><i></i>Settings</span></div>
+  </div>
+  <figcaption><b>Cobalt</b> — the pigment blue, saturated. Crisp and modern; the boldest departure from the warm-materials story.</figcaption>
+</figure>
+
+<figure class="ex slt">
+  <div class="swatches"><i style="background:#5b7fa6"></i><i style="background:#82a6cb"></i></div>
+  <div class="phone">
+    <div class="statusrow"><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="hdrstrip"><span class="streak">day 12</span><span class="chip lg">Gold II · 862</span></div>
+    <div class="axischips"><span class="rankchip">keys <b>A--</b> <span class="up">▲</span></span><span class="rankchip">rhythm <b>C+</b> <span class="up">▲</span></span><span class="rankchip">range <b>B+</b></span><span class="rankchip">span <b>D++</b></span></div>
+    <div class="shelf"><div class="rxcard"><div class="t">Sevenths in flat keys</div><div class="ev">chord-tone:7th deletions at 3× baseline</div><div class="acts"><span>Accept</span><span class="no">Decline</span></div></div></div>
+    <div class="famcol">
+      <div class="famrow"><span class="nm">Keys &amp; signatures</span><span class="sub">instant key ↔ signature recall</span><span class="meta">3 weak</span></div>
+      <div class="famrow"><span class="nm">Chords</span><span class="sub">grab any chord instantly</span><span class="meta hot">31 weak</span></div>
+      <div class="famrow"><span class="nm">Scales</span><span class="sub">keys under the fingers, at tempo</span><span class="meta">6 weak</span></div>
+      <div class="famrow"><span class="nm">Rhythm</span><span class="sub">decode and keep the pulse</span><span class="meta">4 weak</span></div>
+      <div class="famrow"><span class="nm">Passages</span><span class="sub">sight-read fresh music</span><span class="meta">read →</span></div>
+    </div>
+    <div class="footerbar"><div class="btn primary">Practice</div></div>
+    <div class="tabbar"><span class="on"><i></i>Practice</span><span><i></i>Ratings</span><span><i></i>Library</span><span><i></i>Settings</span></div>
+  </div>
+  <figcaption><b>Slate blue</b> — desaturated steel. Understated and serious; reads more "instrument" than "app."</figcaption>
+</figure>
+</div>

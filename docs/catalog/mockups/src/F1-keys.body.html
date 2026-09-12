@@ -1,0 +1,106 @@
+<!-- F1 · Keys & signatures — Prima Volta mockups -->
+<header class="page"><h1>F1 · Keys &amp; signatures</h1>
+<p>Spec: <code>../F1-keys.md</code> · Pure declarative: signature ↔ key, both directions, both clefs, both modes. Every frame runs on any device; minors and bass clef are drill-scope toggles (02).</p></header>
+
+<div class="grouphead">sig→key · the KeyPicker <small>mode named in the prompt · clef part of the atom</small></div>
+<div class="row">
+
+<figure>
+  <div class="phone">
+    <div class="statusrow">KEYS · 3/7<span class="chip mode">Rehearsal</span><span class="devchip off"><i></i>away · no device</span></div>
+    <div class="prompt"><div class="ask">Which major key is this?</div></div>
+    <div class="scorecard"><svg viewBox="0 0 360 100">
+      <g class="stave">
+        <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+        <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+        <line x1="8" y1="66" x2="352" y2="66"/>
+        <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+      </g>
+      <text class="mus clef" x="14" y="60">𝄞</text>
+      <text class="mus acc" x="64" y="32">♯</text><text class="mus acc" x="80" y="47">♯</text>
+      <text class="mus acc" x="96" y="27">♯</text><text class="mus acc" x="112" y="42">♯</text>
+    </svg></div>
+    <div class="keywheel"><svg id="kw1"></svg></div>
+    <div class="feedback good">E major <span class="lat">1.2s · Good</span></div>
+  </div>
+  <figcaption><b>Major mode, treble clef.</b> The full 12-key wheel: chance is honestly 1/12, distractor design doesn't exist, and the circle-of-fifths layout quietly reteaches neighborhood every rep. One reusable widget for the whole app. Knowledge frames keep the portrait phone.</figcaption>
+</figure>
+
+<figure>
+  <div class="phone">
+    <div class="statusrow">KEYS · 4/7<span class="chip mode">Rehearsal</span><span class="devchip off"><i></i>away · no device</span></div>
+    <div class="prompt"><div class="ask">Which minor key is this?</div></div>
+    <div class="scorecard"><svg viewBox="0 0 360 100">
+      <g class="stave">
+        <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+        <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+        <line x1="8" y1="66" x2="352" y2="66"/>
+        <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+      </g>
+      <text class="mus clef" x="14" y="60">𝄞</text>
+      <text class="mus acc" x="64" y="52">♭</text><text class="mus acc" x="80" y="37">♭</text>
+      <text class="mus acc" x="96" y="57">♭</text>
+    </svg></div>
+    <div class="keywheel"><svg id="kw2"></svg></div>
+    <div class="feedback good">C minor <span class="lat">1.8s · Good</span></div>
+  </div>
+  <figcaption><b>Minor mode.</b> Only the prompted mode's ring shows before the answer — a full-size ring of minors, no major labels to lean on. The relative pairing (c ↔ E♭) is revealed with the confirmation. Minors are a drill-scope toggle, not a schema change.</figcaption>
+</figure>
+
+<figure>
+  <div class="phone">
+    <div class="statusrow">KEYS · 5/7<span class="chip mode">Rehearsal</span><span class="devchip off"><i></i>away · no device</span></div>
+    <div class="prompt"><div class="ask">Which major key is this?</div></div>
+    <div class="scorecard"><svg viewBox="0 0 360 100">
+      <g class="stave">
+        <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+        <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+        <line x1="8" y1="66" x2="352" y2="66"/>
+        <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+      </g>
+      <text class="mus clef bass" x="16" y="36">𝄢</text>
+      <text class="mus acc" x="64" y="42">♯</text><text class="mus acc" x="80" y="57">♯</text>
+    </svg></div>
+    <div class="keywheel"><svg id="kw3"></svg></div>
+    <div class="feedback good">D major <span class="lat">1.5s · Good</span></div>
+  </div>
+  <figcaption><b>Bass clef.</b> The same signature sits differently on the bass staff — reading it there is its own visual memory, so clef is part of the atom's identity in both directions. A drill-scope toggle like minors.</figcaption>
+</figure>
+
+</div>
+
+<div class="grouphead">key→sig · the SignaturePicker <small>engraved glyphs, not counts</small></div>
+<div class="row">
+<figure>
+  <div class="phone">
+    <div class="statusrow">KEYS · 6/7<span class="chip mode">Rehearsal</span><span class="devchip off"><i></i>away · no device</span></div>
+    <div class="prompt"><div class="big">B major</div><div class="sub">Tap its signature</div></div>
+    <div class="siggrid">
+      <div class="sigcell"><svg id="sg0"></svg></div><div class="sigcell"><svg id="sg1"></svg></div><div class="sigcell"><svg id="sg2"></svg></div>
+      <div class="sigcell"><svg id="sg3"></svg></div><div class="sigcell"><svg id="sg4"></svg></div><div class="sigcell ok"><svg id="sg5"></svg></div>
+      <div class="sigcell"><svg id="sg6"></svg></div><div class="sigcell"><svg id="sg7"></svg></div><div class="sigcell"><svg id="sg8"></svg></div>
+      <div class="sigcell"><svg id="sg9"></svg></div><div class="sigcell"><svg id="sg10"></svg></div><div class="sigcell"><svg id="sg11"></svg></div>
+    </div>
+    <div class="feedback good">5♯ — F♯ C♯ G♯ D♯ A♯ <span class="lat">1.9s · Good</span></div>
+  </div>
+  <figcaption><b>key→sig on the engraved grid.</b> All twelve signatures as real glyphs — the answer is visual matching, which builds the memory that reading actually uses; the grid doubles as a reference chart. Ordered by count (sharps, then flats); rendered in the configured clef; minor prompts ("g♯ minor") answer on the same grid. Confirmation spells the accidentals in order.</figcaption>
+</figure>
+</div>
+
+<script>
+keywheel(document.getElementById("kw1"), { selected: "E", state: "ok" });
+keywheel(document.getElementById("kw2"), { minorOnly: true, selected: "c", state: "ok" });
+keywheel(document.getElementById("kw3"), { selected: "D", state: "ok" });
+sigcell(document.getElementById("sg0"), "0", "treble");
+sigcell(document.getElementById("sg1"), "1s", "treble");
+sigcell(document.getElementById("sg2"), "2s", "treble");
+sigcell(document.getElementById("sg3"), "3s", "treble");
+sigcell(document.getElementById("sg4"), "4s", "treble");
+sigcell(document.getElementById("sg5"), "5s", "treble");
+sigcell(document.getElementById("sg6"), "6s", "treble");
+sigcell(document.getElementById("sg7"), "1f", "treble");
+sigcell(document.getElementById("sg8"), "2f", "treble");
+sigcell(document.getElementById("sg9"), "3f", "treble");
+sigcell(document.getElementById("sg10"), "4f", "treble");
+sigcell(document.getElementById("sg11"), "5f", "treble");
+</script>

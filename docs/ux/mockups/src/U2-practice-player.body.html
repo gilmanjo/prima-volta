@@ -1,0 +1,118 @@
+<!-- U2 · Practice player (drills) — Prima Volta UX mockups -->
+<header class="page">
+  <h1>U2 · Practice player <span style="color:var(--brass-hi)">— drills (engines A/B)</span></h1>
+  <p>Landscape-first at the instrument (the USB-MIDI adapter takes the bottom port): keybed full-width along the bottom, prompt upper-left, feedback upper-right. Choice widgets swap in for knowledge-only answers.</p>
+</header>
+
+<div class="grouphead">Rehearsal drill <small>landscape · name→midi</small></div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">KEYS &amp; CHORDS · 4/10<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">A♭maj7<small>/C</small></div><div class="sub">LH · blocked</div></div>
+      <div class="rightcol">
+        <div class="feedback good">Clean grab<span class="lat">412 ms</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="u2a"></svg></div>
+  </div>
+  <figcaption><b>The landscape drill layout.</b> Status strip (mode chip always present) · prompt upper-left, the chord symbol one continuous run · feedback upper-right · the keybed full-width, unlabeled. No metronome — this drill is free-tempo. Correct = green LED sweep, latency in ms, the UI ding, straight on.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">Error — the flow stops for reconciliation <small>reverses the never-block rule, deliberately</small></div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">KEYS &amp; CHORDS · 5/10<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">D7<small>/F♯</small></div><div class="sub">RH · blocked</div></div>
+      <div class="rightcol">
+        <div class="feedback bad">F♮ played — expected F♯</div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="u2b"></svg></div>
+    <div class="footerbar"><div class="btn">Replay yours vs expected</div><div class="btn primary">Play the correct answer to continue</div></div>
+    <div class="hintline">…or tap anywhere to continue</div>
+  </div>
+  <figcaption><b>A wrong answer blocks.</b> The flow pauses: expected (brass dashed) vs played (red LED) side by side on the keybed; replay where hearing helps. Continue by tap — or by <b>playing the correct answer</b>, which advances instantly. The rating already took the hit; the pause is for understanding.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">Teach state <small>ungraded · rehearsal context</small></div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">SCALES · new<span class="chip">Teach</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">F major</div><div class="sub">RH · 1 octave</div></div>
+      <div class="rightcol"><div class="feedback info">Ungraded — take your time</div></div>
+    </div>
+    <div class="kbdcard"><svg id="u2c"></svg></div>
+    <div class="footerbar"><div class="btn primary">Play it once</div></div>
+  </div>
+  <figcaption><b>Teach state.</b> The dots show <b>fingering</b> (1-2-3-4 · 1-2-3-4, sourced from references — never invented); the sequence is obvious for a scale, so it isn't numbered. Neutral "Teach" chip, no timer, no grade; "play it once" converts to the first graded rep. Teach lives in rehearsal context, always.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">Performance mode <small>locked pulse</small></div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">RHYTHM<span class="chip perf">Performance</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big" style="font-size:38px">6/8 · dotted</div><div class="sub">2 bars · tap any key · voices: 1</div></div>
+      <div class="rightcol">
+        <div class="metro"><i class="on"></i><i></i><span>♪. = 76</span></div>
+        <div class="feedback info">Count-in — one bar</div>
+      </div>
+    </div>
+    <div class="tapzone">tap the rhythm on any key</div>
+  </div>
+  <figcaption><b>Performance mode.</b> Felt-red chip, locked pulse, mandatory count-in. Continuity is being measured, so the UI stops talking; reconciliation waits for the take to end.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">Choice widgets · block transition <small>portrait (knowledge-only capable)</small></div>
+<div class="row">
+<figure>
+  <div class="phone">
+    <div class="statusrow">NOTE READING<span class="devchip off"><i></i>knowledge only</span></div>
+    <div class="scorecard"><div class="vfbox" id="u2d"></div></div>
+    <p class="grouplab">letter</p>
+    <div class="chips seven"><div class="choice">C</div><div class="choice">D</div><div class="choice sel">E</div><div class="choice">F</div><div class="choice">G</div><div class="choice">A</div><div class="choice">B</div></div>
+    <p class="grouplab">accidental</p>
+    <div class="chips three"><div class="choice sel">♭</div><div class="choice">♮</div><div class="choice">♯</div></div>
+    <p class="grouplab">octave</p>
+    <div class="chips seven"><div class="choice">1</div><div class="choice">2</div><div class="choice">3</div><div class="choice sel">4</div><div class="choice">5</div><div class="choice">6</div><div class="choice">7</div></div>
+  </div>
+  <figcaption><b>Choice answers swap the keybed for the widget</b> — here F2's NoteSelector (letter · accidental · octave, full option space). Same player chrome, portrait-friendly for the couch.</figcaption>
+</figure>
+
+<figure>
+  <div class="phone">
+    <div class="statusrow">STARTER TEMPLATE<span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="interstitial">
+      <div class="upnext">up next</div>
+      <div class="bigname">Arpeggios</div>
+      <div class="intsub">5 minutes · weakest first</div>
+      <div class="progress" style="margin:0"><i class="d"></i><i class="d"></i><i class="c"></i><i></i></div>
+      <div class="intline">Scales done · Reading after</div>
+    </div>
+  </div>
+  <figcaption><b>Block transition.</b> A centered interstitial — what's next, how long, where you are in the template. Auto-advances, tappable, skippable; nothing is owed.</figcaption>
+</figure>
+</div>
+
+<script>
+kbd(document.getElementById("u2a"), "C2", "C4",
+  { "C3": "ok", "Eb3": "ok", "G3": "ok", "Ab3": "ok" }, {});
+kbd(document.getElementById("u2b"), "C4", "C6",
+  { "F4": "err", "F#4": "exp", "A4": "ok", "C5": "ok", "D5": "ok" }, {});
+kbd(document.getElementById("u2c"), "C3", "A4",
+  {},
+  { path: ["F3", "G3", "A3", "Bb3", "C4", "D4", "E4", "F4"],
+    fingers: ["1", "2", "3", "4", "1", "2", "3", "4"] });
+vf(document.getElementById("u2d"), { key: "Bb", clef: "treble", width: 344, measures: [ { notes: [ { k: ["e/4"], d: "w", acc: ["b"] } ] } ] });
+</script>

@@ -1,0 +1,174 @@
+<!-- F5 · Scales — Prima Volta mockups -->
+<header class="page"><h1>F5 · Scales</h1>
+<p>Spec: <code>../F5-scales.md</code> · Both variants, tiers T1–T5, results. Shares F6's grading machinery (evenness, turnaround, HT alignment).</p></header>
+
+<div class="grouphead">name→midi · tier ladder</div>
+<div class="row">
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">SCALES · new<span class="chip">Teach</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">B major</div><div class="sub">1 octave · RH · up-down</div></div>
+      <div class="rightcol">
+        <div class="feedback info">Ungraded — take your time</div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t1"></svg></div>
+    <div class="footerbar"><div class="btn primary">Play it once</div></div>
+  </div>
+  <figcaption><b>T1 — one octave, hands separate</b> (shown in its teach state: the terrain shows on the item's first encounter only, the F6 convention — graded reps are from memory). The dots carry the sourced fingering (1-2-3 · 1-2-3-4-5, thumb under at E). B major's five black keys make the terrain the lesson. Top note once at the turnaround.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">SCALES · 2/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">A♭ major</div><div class="sub">2 octaves · RH · up-down</div></div>
+      <div class="rightcol">
+        <div class="metro"><i></i><i class="on"></i><i></i><i></i><span>♪ = 72</span></div>
+        <div class="feedback good">Octave 1 clean — crossing at the thumb</div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t2"></svg></div>
+  </div>
+  <figcaption><b>T2 — two octaves, hands separate.</b> Blank keyboard on graded reps; played keys light as they land (shown mid-run). Wrong notes log <code>substitution</code> tagged <code>scale-degree:N</code> + <code>key:A♭</code>.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">SCALES · 3/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">D major</div><div class="sub">2 octaves · hands together</div></div>
+      <div class="rightcol">
+        <div class="metro"><i></i><i class="on"></i><i></i><i></i><span>♪ = 66</span></div>
+        <div class="feedback good">Hands within 30ms per degree</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><p class="grouplab">LH</p><div class="kbdcard"><svg id="t3a"></svg></div></div>
+      <div style="flex:1"><p class="grouplab">RH</p><div class="kbdcard"><svg id="t3b"></svg></div></div>
+    </div>
+  </div>
+  <figcaption><b>T3 — hands together, parallel.</b> Adds the hand-alignment stat (onset delta per degree, as F6 T3); the asymmetric thumb-crossings (different degrees per hand) are exactly where misalignment shows.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">SCALES · 4/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">E major</div><div class="sub">2 octaves · RH · up-down</div></div>
+      <div class="rightcol">
+        <div class="metro"><i></i><i></i><i class="on"></i><i></i><span>♪ = 80</span></div>
+        <div class="feedback good">Under the gate <span class="lat">♪=82 · Good</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t4"></svg></div>
+  </div>
+  <figcaption><b>T4 — tempo gates, hands separate.</b> Same screen, stricter clock (v0 anchor ♪=80, tunable — the metronome shows the gate). Evenness still graded — speed bought with unevenness doesn't pass.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">SCALES · 5/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">B♭ major</div><div class="sub">4 octaves · hands together</div></div>
+      <div class="rightcol">
+        <div class="metro"><i></i><i></i><i></i><i class="on"></i><span>♪ = 104 · oct 1 of 4</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t5"></svg></div>
+  </div>
+  <figcaption><b>T5 — four octaves at the RCM upper anchor</b> (♪=104, HT). The full technique-exam scale. The viewport is beat-indexed to the expected path — it leads the hand, never chases played keys.</figcaption>
+</figure>
+
+</div>
+
+<div class="grouphead">scale types <small>plug-and-play from drill scope — new types are data, not schema</small></div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">SCALES · 2/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">A minor</div><div class="sub">harmonic · 2 octaves · RH · up-down</div></div>
+      <div class="rightcol">
+        <div class="metro"><i></i><i class="on"></i><i></i><i></i><span>♪ = 72</span></div>
+        <div class="feedback good">G♯ leading tone landed</div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="st1"></svg></div>
+  </div>
+  <figcaption><b>Scale types are config, not schema.</b> Toggling "harmonic minor" in drill scope reveals its items with FSRS state intact (cards created lazily); chromatic, natural/melodic minor, and later modes or pentatonics arrive the same way — each type is a data entry (interval pattern + sourced fingering + scope defaults). Same grading, plus type-specific tags (the ♯7 here).</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">keysig→midi <small>mode named — a signature alone is ambiguous</small></div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">SCALES · from signature · 3/4<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play the major scale of this key</div><div class="sub">1 octave · RH</div>
+        <div class="scorecard" style="margin-top:8px"><svg viewBox="0 0 360 100">
+          <g class="stave">
+            <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+            <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+            <line x1="8" y1="66" x2="352" y2="66"/>
+            <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+          </g>
+          <text class="mus clef" x="14" y="60">𝄞</text>
+          <text class="mus acc" x="64" y="52">♭</text><text class="mus acc" x="80" y="37">♭</text>
+          <text class="mus acc" x="96" y="57">♭</text>
+        </svg></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback good">E♭ major, under way <span class="lat">first note 1.9s</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="ks1"></svg></div>
+  </div>
+  <figcaption><b>keysig→midi.</b> Signature → scale, with the mode named in the prompt — a signature alone is ambiguous between relative major and minor (F1's lesson). The key itself is never named; latency to the first correct note is the decode stat.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">results</div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">SCALES · result<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="prompt"><div class="ask">A♭ major · 2 oct · RH — result</div></div>
+    <div class="landmain">
+      <div class="rightcol">
+        <div class="timing">
+          <i style="height:70%"></i><i style="height:72%"></i><i style="height:74%"></i><i class="late" style="height:48%"></i>
+          <i style="height:70%"></i><i style="height:75%"></i><i style="height:73%"></i><i class="late" style="height:44%"></i>
+          <i style="height:72%"></i><i style="height:74%"></i><i style="height:71%"></i><i style="height:73%"></i><i style="height:75%"></i>
+        </div>
+        <div class="feedback info">Both drags are the 3rd-finger crossings on the way down</div>
+      </div>
+      <div class="rightcol">
+        <div class="axes">
+          <div class="axis"><span>Notes</span><div class="bar"><i style="width:100%"></i></div><span class="val">29/29</span></div>
+          <div class="axis"><span>Evenness</span><div class="bar"><i style="width:82%"></i></div><span class="val">σ 8%</span></div>
+          <div class="axis"><span>Tempo</span><div class="bar"><i style="width:92%"></i></div><span class="val">♪=74</span></div>
+        </div>
+        <div class="footerbar"><div class="btn">Replay my take</div><div class="btn primary">Next</div></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Results.</b> F6's results anatomy with scale semantics: the late onsets cluster at descending crossings — evenness is where MIDI sees fingering quality. Feeds the same per-key evidence as F4/F6 latencies (three legs of <code>key:X</code> diagnosis).</figcaption>
+</figure>
+</div>
+
+<script>
+kbd(document.getElementById("t1"), "A3", "C5", {},
+  { path: ["B3", "C#4", "D#4", "E4", "F#4", "G#4", "A#4", "B4"],
+    fingers: ["1", "2", "3", "1", "2", "3", "4", "5"] });
+kbd(document.getElementById("st1"), "G3", "C5", { "A3": "ok", "B3": "ok", "C4": "ok", "D4": "ok", "E4": "ok", "G#4": "ok" }, {});
+kbd(document.getElementById("t2"), "G3", "C5", { "Ab3": "ok", "Bb3": "ok", "C4": "ok", "Db4": "ok", "Eb4": "ok" }, {});
+kbd(document.getElementById("t3a"), "C2", "E3", { "D2": "ok", "E2": "ok", "F#2": "ok" }, {});
+kbd(document.getElementById("t3b"), "C3", "E4", { "D3": "ok", "E3": "ok", "F#3": "ok" }, {});
+kbd(document.getElementById("t4"), "C4", "F5", { "E4": "ok", "F#4": "ok", "G#4": "ok", "A4": "ok" }, {});
+kbd(document.getElementById("t5"), "G2", "C4", { "Bb2": "ok", "C3": "ok", "D3": "ok", "Eb3": "ok" }, {});
+kbd(document.getElementById("ks1"), "C4", "F5", { "Eb4": "ok", "F4": "ok", "G4": "ok" }, {});
+</script>

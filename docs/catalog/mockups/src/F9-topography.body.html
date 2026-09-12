@@ -1,0 +1,116 @@
+<!-- F9 · Topography — Prima Volta mockups -->
+<header class="page"><h1>F9 · Keyboard topography</h1>
+<p>Spec: <code>../F9-topography.md</code> · Eyes forward; hands find the keys. Full tier ladder T0–T4. Honor system by design — looking down shows up as latency anyway.</p></header>
+
+<div class="grouphead">tier ladder</div>
+<div class="row">
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">TOPOGRAPHY · 1/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="queue"><span class="now">D4</span><span class="next">→ E4 · G4 · C4 …</span></div>
+      <div class="rightcol">
+        <div class="feedback good">D4 <span class="lat">0.6s</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t0"></svg></div>
+    <div class="hintline">eyes up — stay in position</div>
+  </div>
+  <figcaption><b>T0 — single notes near position.</b> Five-finger territory; the habit being built is simply not looking down. Streams spawn at a random register every rep — no home position to camp on — and the first target's latency is reported separately as the cold-start stat.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">TOPOGRAPHY · 2/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="queue"><span class="now">B♭3</span><span class="next">→ E4 · G3 · D4 …</span></div>
+      <div class="rightcol">
+        <div class="feedback good">B♭3 <span class="lat">0.9s</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t1"></svg></div>
+    <div class="hintline">eyes up — feel for the black-key landmarks</div>
+  </div>
+  <figcaption><b>T1 — leaps within the octave.</b> The two- and three-black-key groups become the braille of the keyboard.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">TOPOGRAPHY · 3/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="queue"><span class="now">A♭3</span><span class="next">→ F5 · C4 · E♭2 …</span></div>
+      <div class="rightcol">
+        <div class="feedback bad">A♭4 played — right key, wrong octave</div>
+        <div class="axes">
+          <div class="axis"><span>Stream</span><div class="bar"><i style="width:70%"></i></div><span class="val">7/10</span></div>
+          <div class="axis"><span>Median</span><div class="bar"><i style="width:55%"></i></div><span class="val">1.1s</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t2"></svg></div>
+    <div class="footerbar"><div class="btn">Replay yours vs expected</div><div class="btn primary">Play the correct answer to continue</div></div>
+    <div class="hintline">…or tap anywhere to continue</div>
+  </div>
+  <figcaption><b>T2 — cross-keyboard leaps.</b> Wrong-octave is the signature failure — the undershot leap logs <code>wrongOctave</code> + <code>shift:leap</code>, the same tags F6 and passage shift-hesitations feed (one weakness, visible across three families). The flow stops for reconciliation: expected A♭3 dashed vs the played A♭4; continue by playing the correct key, or tap through.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">TOPOGRAPHY · 4/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="queue"><span class="now">D min</span><span class="next">→ B♭ maj · F maj …</span></div>
+      <div class="rightcol">
+        <div class="feedback good">D · F · A <span class="lat">0.8s</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t3"></svg></div>
+    <div class="hintline">grab it — root position, either hand</div>
+  </div>
+  <figcaption><b>T3 — chord grabs</b> (triads; sevenths admit later). The shape-finding half of F4, without the symbol-decoding half.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">TOPOGRAPHY · speed stream · 5/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="queue"><span class="now">F♯2</span><span class="next">→ C5 · A3 · E♭4 …</span></div>
+      <div class="rightcol">
+        <div class="feedback good">streak 11 <span class="lat">med 0.7s</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t4"></svg></div>
+  </div>
+  <figcaption><b>T4 — speed streams.</b> The inter-prompt interval shrinks (~1.2s here) and misses simply scroll past — pressure without punishment. Summary reports accuracy, median latency, and worst-leap latency.</figcaption>
+</figure>
+
+</div>
+
+<div class="grouphead">staff-cue stream <small>the composite: continuous staff→hand under travel</small></div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">TOPOGRAPHY · staff stream · 3/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play as they come</div>
+        <div class="scorecard" style="margin-top:8px"><div class="vfbox" id="ss"></div></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback good">A4 <span class="lat">0.7s</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="ss1"></svg></div>
+  </div>
+  <figcaption><b>staff→midi stream.</b> Targets arrive on a rolling staff — current note full-ink, next ghosted, so the eyes never drop; the composite of F2's reading and F9's finding, and the bridge to F10's passages. A single-target queue (one decision at a time), so exempt from the metric-context rule; self-paced at entry, timed feed at the speed stream. Name-cue remains the pure-topography isolate for motor-only remediation.</figcaption>
+</figure>
+</div>
+
+<script>
+kbd(document.getElementById("t0"), "C4", "C5", { "D4": "ok" }, {});
+kbd(document.getElementById("ss1"), "C4", "C5", { "A4": "ok" }, {});
+vf(document.getElementById("ss"), { height: 108, measures: [{ notes: [{ k: ["a/4"], d: "q" }, { k: ["e/4"], d: "q", style: "#b9b4a4" }] }] });
+kbd(document.getElementById("t1"), "C3", "F4", { "Bb3": "ok" }, {});
+kbd(document.getElementById("t2"), "F3", "A5", { "Ab4": "err", "Ab3": "exp" }, {});
+kbd(document.getElementById("t3"), "C3", "E4", { "D3": "ok", "F3": "ok", "A3": "ok" }, {});
+kbd(document.getElementById("t4"), "C2", "C4", { "F#2": "ok" }, {});
+</script>

@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F10 · Sight-reading passages — Prima Volta mockups</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Schibsted+Grotesk:wght@400;500;700&family=Spline+Sans+Mono:wght@400;600&display=swap"><script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+<style>
+/* Prima Volta — mockup design system v1.
+   Direction: ebony piano-lacquer UI · paper score cards (sheet music on a dark grand)
+   · brass accents · felt red · volta-bracket brand mark. CSS only — no raster assets. */
+
+@font-face { /* SMuFL engraving glyphs — Bravura Text (SIL OFL, Steinberg) */
+  font-family: "Bravura Text";
+  src: url("https://cdn.jsdelivr.net/gh/steinbergmedia/bravura@latest/redist/woff/BravuraText.woff2") format("woff2"),
+       url("https://cdn.jsdelivr.net/gh/steinbergmedia/bravura@latest/redist/woff/BravuraText.woff") format("woff");
+  font-display: swap;
+}
+
+:root {
+  --stage: #121317; --stage-glow: #23242b;
+  --shell-hi: #1b1d22; --shell-lo: #141519; --shell-edge: #2e3037;
+  --surface: #1e2026; --surface-hi: #262931; --line: #33363e;
+  --ivory: #ece9e0; --muted: #a2a3ab; --faint: #6e7078;
+  --brass: #5b7fa6; --brass-hi: #82a6cb; --brass-lo: #46658a; --brass-ink: #0e1826; /* accent v2: slate blue (var names historical) */
+  --paper-hi: #f8f5ec; --paper-lo: #eee9db; --ink: #1e1f24; --ink-soft: #4a4c52;
+  --felt: #a5342e; --felt-hi: #c14a42;
+  --good: #58b573; --good-dim: #274233; --bad: #d9564c; --bad-dim: #46262a;
+  --warn: #d9a03f;
+  --ui: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --disp: "Instrument Serif", Georgia, serif;
+  --mono: "Spline Sans Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 34px 22px 70px; color: var(--ivory);
+  background: radial-gradient(1100px 520px at 50% -8%, var(--stage-glow), var(--stage) 70%) fixed var(--stage);
+  font-family: var(--ui); line-height: 1.5;
+}
+header.page { max-width: 1280px; margin: 0 auto 26px; }
+header.page h1 { font-family: var(--disp); font-weight: 400; font-size: 34px; margin: 0 0 6px; letter-spacing: 0.01em; }
+header.page p { color: var(--muted); font-size: 14px; margin: 0; max-width: 78ch; }
+header.page code { font-family: var(--mono); font-size: 12px; color: var(--brass-hi); background: none; }
+.row { display: flex; flex-wrap: wrap; gap: 34px; max-width: 1280px; margin: 0 auto; align-items: flex-start; }
+figure { margin: 0; width: 390px; }
+figcaption { font-size: 13px; color: var(--muted); padding: 12px 8px 0; line-height: 1.55; }
+figcaption b { color: var(--ivory); }
+figcaption code { font-family: var(--mono); font-size: 11.5px; color: var(--brass-hi); }
+
+/* ---------- the device ---------- */
+.phone {
+  width: 390px; border-radius: 30px; padding: 14px 16px 12px; position: relative;
+  background: linear-gradient(178deg, var(--shell-hi), var(--shell-lo) 62%);
+  border: 1px solid var(--shell-edge);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.phone::after { /* home indicator */
+  content: ""; display: block; width: 110px; height: 4px; border-radius: 2px;
+  background: var(--line); margin: 6px auto 0;
+}
+.statusrow { display: flex; align-items: center; font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+.statusrow .devchip { margin-left: auto; display: flex; align-items: center; gap: 5px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; color: var(--muted); }
+.devchip i { width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
+.devchip.off i { background: var(--faint); box-shadow: none; }
+
+.brandrow { display: flex; align-items: center; gap: 8px; }
+.voltamark { width: 40px; height: 15px; flex: none; }
+.voltamark path { stroke: var(--brass); stroke-width: 2; fill: none; }
+.voltamark text { font-family: var(--disp); font-style: italic; font-size: 11px; fill: var(--brass); }
+.brand { font-size: 10px; letter-spacing: 0.26em; color: var(--muted); font-weight: 700; }
+.brandrow .mode { margin-left: auto; }
+
+.topbar { display: flex; align-items: center; gap: 8px; }
+.block { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; color: var(--ivory); }
+.chip { border: 1px solid var(--line); border-radius: 999px; padding: 2.5px 10px; font-size: 11px; color: var(--muted); background: var(--surface); }
+.chip.mode { color: var(--brass-hi); border-color: rgba(91,127,166,0.45); background: rgba(91,127,166,0.08); }
+.chip.perf { color: var(--felt-hi); border-color: rgba(193,74,66,0.5); background: rgba(165,52,46,0.12); }
+.progress { margin-left: auto; display: flex; gap: 3.5px; align-items: center; }
+.progress i { width: 13px; height: 4px; border-radius: 2px; background: var(--line); }
+.progress i.d { background: var(--brass); }
+.progress i.c { background: var(--ivory); }
+
+/* ---------- prompt ---------- */
+.prompt { text-align: center; padding: 4px 0 0; }
+.prompt .big { font-family: var(--disp); font-size: 58px; line-height: 1.05; letter-spacing: 0.01em; }
+.prompt .big small { font-size: 1em; color: inherit; vertical-align: 0; letter-spacing: inherit; font-weight: inherit; }
+.prompt .big .bass { font-size: 0.66em; }
+.prompt .sub { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+.prompt .ask { font-size: 17px; font-weight: 700; letter-spacing: 0.01em; }
+
+/* ---------- score card: paper on the lacquer ---------- */
+.scorecard {
+  background: linear-gradient(176deg, var(--paper-hi), var(--paper-lo));
+  border-radius: 14px; padding: 12px 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.8);
+  position: relative;
+}
+.scorecard svg { display: block; width: 100%; height: auto; }
+.scorecard.locked svg { opacity: 0.42; }
+.scorecard .lockchip {
+  position: absolute; inset: auto 10px 10px auto; font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper-hi);
+  background: rgba(30,31,36,0.82); border-radius: 999px; padding: 3px 10px;
+}
+.vfbox svg { display: block; width: 100%; height: auto; }
+.scoreghost { position: absolute; font-family: var(--disp); font-style: italic; font-size: 12.5px; color: #b9b4a4; }
+.stave line { stroke: #494b52; stroke-width: 1; }
+.stave .barline { stroke: #2c2d33; stroke-width: 1.6; }
+.notehead { fill: var(--ink); }
+.notehead.open { fill: none; stroke: var(--ink); stroke-width: 1.7; }
+.notehead.ok { fill: #2f7d4a; }
+.notehead.err { fill: #c0392f; }
+.stem { stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; }
+.beam { fill: var(--ink); rx: 1; }
+.ledger { stroke: #494b52; stroke-width: 1.2; }
+.mus { font-family: "Bravura Text", "Noto Music", "Segoe UI Symbol", serif; fill: var(--ink); }
+.mus-inline { font-family: "Bravura Text", "Noto Music", "Segoe UI Symbol", serif; }
+/* SMuFL registration: em = staff height (40px on the standard card); baseline sits on the
+   glyph's home line/space. Authored y-offsets are compensated via transforms. */
+.acc { font-size: 40px; transform: translateY(-6px); }
+.clef { font-size: 40px; transform: translateY(-4px); }
+.clef.bass { font-size: 40px; transform: none; }
+.tsig { font-family: var(--disp); font-weight: 400; font-size: 17px; fill: var(--ink); }
+.cursorband { fill: rgba(91,127,166,0.16); }
+.curband { position: absolute; top: 7%; bottom: 7%; background: rgba(91,127,166,0.16); border-radius: 4px; }
+.ghost { font-family: var(--disp); font-style: italic; font-size: 12px; fill: #b9b4a4; }
+
+/* ---------- keyboard card ---------- */
+.kbdcard {
+  background: linear-gradient(180deg, #101116, #0c0d11);
+  border: 1px solid var(--line); border-radius: 14px; padding: 10px 10px 8px;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
+}
+.kbdcard svg { display: block; width: 100%; height: auto; }
+.keylab { font-family: var(--mono); font-size: 9px; fill: var(--muted); text-anchor: middle; }
+.pathdot { fill: var(--brass); }
+.pathnum { font-family: var(--mono); font-size: 9px; font-weight: 600; fill: var(--brass-ink); text-anchor: middle; }
+
+/* ---------- choices ---------- */
+.grouplab { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--faint); margin: 0 0 -6px 2px; font-weight: 700; }
+.chips { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.chips.four { grid-template-columns: repeat(4, 1fr); }
+.choice {
+  border: 1px solid var(--line); border-radius: 13px; padding: 12px 6px; text-align: center;
+  font-size: 15.5px; font-weight: 500; background: linear-gradient(180deg, var(--surface-hi), var(--surface));
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.choice small { display: block; font-weight: 400; color: var(--muted); font-size: 10.5px; }
+.choice.sel { border-color: var(--brass); color: var(--brass-hi); box-shadow: 0 0 0 1px var(--brass); }
+.choice.ok { border-color: var(--good); color: var(--good); background: linear-gradient(180deg, #22352b, var(--good-dim)); }
+.choice.err { border-color: var(--bad); color: #eb897f; background: linear-gradient(180deg, #3c2326, var(--bad-dim)); }
+
+/* ---------- feedback / stats ---------- */
+.feedback { border-radius: 13px; padding: 11px 14px; font-size: 13.5px; display: flex; gap: 10px; align-items: center; border: 1px solid transparent; }
+.feedback .lat { margin-left: auto; font-family: var(--mono); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.feedback.good { background: #20302a; border-color: rgba(88,181,115,0.3); color: #9fd8b0; }
+.feedback.good .lat { color: var(--good); }
+.feedback.bad { background: #342226; border-color: rgba(217,86,76,0.35); color: #eb9b92; }
+.feedback.bad .lat { color: #eb897f; }
+.feedback.info { background: #22252b; border-color: var(--line); color: var(--muted); }
+.feedback.info .lat { color: var(--brass-hi); }
+
+.metro { display: flex; gap: 9px; justify-content: center; align-items: center; padding: 2px 0; }
+.metro i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.metro i.on { background: var(--brass-hi); }
+.metro span { font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-left: 6px; }
+
+.axes { display: flex; flex-direction: column; gap: 10px; }
+.axis { display: grid; grid-template-columns: 88px 1fr 52px; gap: 12px; align-items: center; font-size: 13px; color: var(--muted); }
+.axis .bar { height: 7px; border-radius: 4px; background: #2a2c33; overflow: hidden; position: relative; box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); }
+.axis .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: linear-gradient(90deg, var(--brass-lo), var(--brass-hi)); }
+.axis .val { text-align: right; font-family: var(--mono); font-weight: 600; color: var(--ivory); font-size: 12.5px; }
+.axis.na .val { color: var(--faint); font-weight: 400; }
+
+.timing { display: flex; gap: 3px; align-items: flex-end; height: 46px; padding: 6px 8px; border-radius: 12px;
+  background: #14151a; border: 1px solid var(--line); box-shadow: inset 0 2px 6px rgba(0,0,0,0.5); }
+.timing i { flex: 1; border-radius: 2px; background: linear-gradient(180deg, var(--good), #3d8a57); min-height: 8px; }
+.timing i.early { background: linear-gradient(180deg, var(--warn), #a87527); }
+.timing i.late { background: linear-gradient(180deg, var(--bad), #a53a32); }
+
+.tapzone { min-height: 96px; border: 1.5px dashed #3c3f47; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  color: var(--faint); font-size: 14px; background: rgba(255,255,255,0.015); }
+
+.ring { display: flex; align-items: center; gap: 12px; justify-content: center; color: var(--muted); font-size: 13px; }
+.ring .r { width: 50px; height: 50px; border-radius: 50%; flex: none;
+  background: conic-gradient(var(--brass) 72%, #2a2c33 0); position: relative; display: flex; align-items: center; justify-content: center; }
+.ring .r::before { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--shell-hi); }
+.ring .r span { position: relative; font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--brass-hi); }
+
+.queue { display: flex; gap: 10px; justify-content: center; align-items: baseline; color: var(--faint); }
+.queue .now { font-family: var(--disp); font-size: 54px; color: var(--ivory); line-height: 1; }
+.queue .next { font-size: 14px; }
+
+.footerbar { display: flex; gap: 10px; margin-top: 2px; }
+.btn { flex: 1; text-align: center; border-radius: 13px; padding: 12px; font-weight: 700; font-size: 14.5px;
+  border: 1px solid var(--line); color: var(--muted); background: linear-gradient(180deg, var(--surface-hi), var(--surface)); }
+.btn.primary { background: var(--brass); border-color: var(--brass-lo); color: #eef3f8; box-shadow: none; }
+.hintline { text-align: center; color: var(--faint); font-size: 11.5px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .metro i.on { animation: pulse 0.75s ease-in-out infinite alternate; }
+  @keyframes pulse { from { opacity: 0.55; } to { opacity: 1; } }
+}
+
+/* ---------- variant/tier section labels ---------- */
+.grouphead { max-width: 1280px; margin: 34px auto 14px; font-size: 12px; letter-spacing: 0.16em;
+  text-transform: uppercase; font-weight: 700; color: var(--brass-hi);
+  border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.grouphead small { color: var(--faint); font-weight: 400; letter-spacing: 0.04em; text-transform: none; margin-left: 10px; }
+
+/* ---------- KeyPicker wheel (F1) ---------- */
+.keywheel { display: flex; justify-content: center; padding: 2px 0; }
+.keywheel svg { width: 288px; height: auto; }
+.seg { fill: var(--surface-hi); stroke: var(--line); stroke-width: 1; }
+.seg.ok { fill: var(--good-dim); stroke: var(--good); stroke-width: 1.6; }
+.seg.sel { fill: rgba(91,127,166,0.14); stroke: var(--brass); stroke-width: 1.6; }
+.seglab { fill: var(--ivory); font-family: var(--ui); font-size: 14px; font-weight: 700; text-anchor: middle; }
+.segsub { fill: var(--faint); font-family: var(--mono); font-size: 8.5px; text-anchor: middle; }
+.wheelhint { fill: var(--faint); font-family: var(--ui); font-size: 11px; text-anchor: middle; }
+
+.seglab.min { font-size: 11px; font-style: italic; font-weight: 500; }
+
+.chips.roots { grid-template-columns: repeat(6, 1fr); gap: 7px; }
+.chips.roots .choice { padding: 8px 2px; font-size: 12.5px; border-radius: 10px; font-weight: 600; }
+.chips.seven { grid-template-columns: repeat(7, 1fr); gap: 7px; }
+.chips.seven .choice { padding: 9px 2px; font-size: 14px; border-radius: 10px; font-weight: 600; }
+.chips.three { grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.chips.three .choice { padding: 8px 2px; font-size: 15px; border-radius: 10px; }
+.chips.five { grid-template-columns: repeat(5, 1fr); gap: 7px; }
+.chips.five .choice { padding: 9px 2px; font-size: 14px; border-radius: 10px; font-weight: 600; }
+
+/* Direction arrows: drawn glyphs, never text ↑↓ */
+.dirarrow { width: 0.5em; height: 0.5em; fill: none; stroke: var(--brass-hi);
+  stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: 4%; margin-left: 3px; }
+
+/* ---------- SignaturePicker grid (F1): engraved mini-signatures ---------- */
+.siggrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.siggrid.two { grid-template-columns: repeat(2, 1fr); }
+.sigcell {
+  background: linear-gradient(176deg, var(--paper-hi), var(--paper-lo));
+  border: 1px solid var(--line); border-radius: 10px; padding: 3px 3px 1px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.7);
+}
+.sigcell svg { display: block; width: 100%; height: auto; }
+.sigcell.ok { outline: 2px solid var(--good); outline-offset: -1px;
+  box-shadow: 0 0 0 3px rgba(88,181,115,0.22), 0 2px 6px rgba(0,0,0,0.35); }
+
+/* Prima Volta — app-shell additions for the UX mockups (U1–U8).
+   Extends the catalog design system (_style.css). CSS + icon-set-style chrome only. */
+
+/* ---------- landscape phone (at-instrument: the USB-MIDI adapter takes the bottom port) ---------- */
+figure.wide { width: 744px; }
+.phoneL {
+  width: 744px; border-radius: 26px; padding: 12px 16px 10px; position: relative;
+  background: linear-gradient(178deg, var(--shell-hi), var(--shell-lo) 62%);
+  border: 1px solid var(--shell-edge);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.phoneL::after { content: ""; display: block; width: 4px; height: 90px; border-radius: 2px;
+  background: var(--line); position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
+.landmain { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; align-items: start; }
+.landmain .prompt { text-align: left; padding: 6px 0 0 8px; }
+.landmain .prompt .big { font-size: 52px; }
+.rightcol { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- tab bar ---------- */
+.tabbar { display: flex; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 2px; }
+.tabbar.top { border-top: none; border-bottom: 1px solid var(--line); padding: 2px 0 8px; margin: 0; }
+.tabbar span { flex: 1; text-align: center; font-size: 10.5px; letter-spacing: 0.06em; color: var(--faint); font-weight: 600; }
+.tabbar span.on { color: var(--brass-hi); }
+.tabbar span i { display: block; width: 22px; height: 3px; border-radius: 2px; margin: 0 auto 5px; background: transparent; }
+.tabbar span.on i { background: var(--brass); }
+
+/* ---------- strength map ---------- */
+.hdrstrip { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
+.hdrstrip .streak { font-family: var(--mono); color: var(--faint); }
+.hdrstrip .lg { margin-left: auto; }
+.chip.lg { color: var(--brass-hi); border-color: rgba(91,127,166,0.4); }
+.axischips { display: flex; gap: 6px; flex-wrap: wrap; }
+.rankchip { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); border-radius: 8px;
+  padding: 4px 8px; background: var(--surface); color: var(--muted); }
+.rankchip b { color: var(--ivory); font-weight: 600; }
+.rankchip .up { color: var(--good); } .rankchip .dn { color: var(--faint); }
+.famgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.famcard { border-radius: 13px; padding: 10px 11px; position: relative; border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--surface-hi), var(--surface)); min-height: 58px; }
+.famcard .nm { font-size: 13px; font-weight: 700; }
+.famcard .st { font-size: 10.5px; color: var(--faint); font-family: var(--mono); margin-top: 3px; }
+.famcard.b3 { background: linear-gradient(180deg, #33301f, #262214); border-color: rgba(91,127,166,0.55);
+  box-shadow: 0 0 18px rgba(91,127,166,0.28), inset 0 1px 0 rgba(255,255,255,0.06); }
+.famcard.b2 { background: linear-gradient(180deg, #2c2a1d, #211f15); border-color: rgba(91,127,166,0.35);
+  box-shadow: 0 0 10px rgba(91,127,166,0.14); }
+.famcard.b1 { background: linear-gradient(180deg, #26251d, var(--surface)); border-color: #3a382c; }
+.famcard.unlit { background: none; border-style: dashed; border-color: #3a3c43; }
+.famcard.unlit .nm { color: var(--faint); }
+.famcard.offd { opacity: 0.45; }
+.weakdot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--felt-hi); box-shadow: 0 0 7px rgba(193,74,66,0.8); }
+.kbglyph { position: absolute; bottom: 8px; right: 9px; font-size: 10px; color: var(--faint); font-family: var(--mono); }
+
+/* ---------- prescription shelf ---------- */
+.shelf { display: flex; gap: 9px; overflow: hidden; }
+.rxcard { border: 1px solid var(--line); border-radius: 13px; padding: 10px 12px; flex: 1;
+  background: #212227; }
+.rxcard .t { font-size: 13px; font-weight: 700; }
+.rxcard .ev { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.rxcard .acts { display: flex; gap: 8px; margin-top: 8px; }
+.rxcard .acts span { font-size: 11.5px; font-weight: 700; color: var(--brass-hi); }
+.rxcard .acts span.no { color: var(--faint); font-weight: 500; }
+
+/* ---------- sheets, banners, lists ---------- */
+.sheet { background: linear-gradient(180deg, #24262d, #1d1f25); border: 1px solid var(--line);
+  border-radius: 16px 16px 12px 12px; padding: 12px; box-shadow: 0 -8px 24px rgba(0,0,0,0.4); }
+.sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 10px; }
+.banner { border: 1px solid rgba(217,160,63,0.4); background: rgba(217,160,63,0.08); color: #e0b96a;
+  border-radius: 11px; padding: 8px 12px; font-size: 12px; }
+.listrow { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid #24262c; font-size: 13px; }
+.listrow:last-child { border-bottom: none; }
+.listrow .pip { width: 10px; height: 10px; border-radius: 50%; flex: none; background: #2b2d34; }
+.listrow .pip.p3 { background: var(--brass-hi); }
+.listrow .pip.p2 { background: #5c718a; }
+.listrow .pip.p1 { background: #3c4654; }
+.listrow .pip.p0 { background: none; border: 1.5px dashed #3c3f47; }
+.listrow .meta { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); white-space: nowrap; }
+.gatedots { display: inline-flex; gap: 2.5px; margin-left: 6px; vertical-align: 8%; }
+.gatedots i { width: 5px; height: 5px; border-radius: 50%; background: #2f323a; }
+.gatedots i.on { background: var(--good); }
+.heat { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+.heat i { height: 22px; border-radius: 6px; background: #23252b; }
+.heat i.h3 { background: #4d4123; box-shadow: inset 0 0 6px rgba(130,166,203,0.5); }
+.heat i.h2 { background: #3a3320; }
+.heat i.h1 { background: #2c2a20; }
+.heat i.h0 { background: none; border: 1px dashed #34363d; }
+
+/* ---------- leagues & ratings ---------- */
+.leaguecard { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px;
+  background: linear-gradient(180deg, var(--surface-hi), var(--surface)); }
+.leaguecard .lgname { font-family: var(--disp); font-size: 26px; line-height: 1.1; }
+.leaguecard .lgname small { font-size: 0.62em; color: var(--brass-hi); margin-left: 4px; }
+.leaguecard .num { font-family: var(--mono); color: var(--muted); font-size: 12.5px; }
+.leaguecard .dom { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); font-weight: 700; }
+.leaguecard.hero { border-color: rgba(91,127,166,0.45); background: #22262e; }
+.gold .lgname { color: #e8c65a; } .silver .lgname { color: #c9cdd4; } .plat .lgname { color: #9fd8cd; } .bronze .lgname { color: #d29a6b; }
+.spreadstrip { display: flex; gap: 4px; margin-top: 8px; align-items: center; }
+.spreadstrip i { flex: 1; height: 5px; border-radius: 3px; background: #2b2d34; position: relative; }
+.spreadstrip i b { position: absolute; top: -2.5px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--brass-hi); }
+.spreadstrip i.weak b { background: var(--felt-hi); }
+.spark { width: 100%; height: 26px; }
+.spark polyline { fill: none; stroke: var(--brass); stroke-width: 1.6; opacity: 0.85; }
+.feed { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.feed b { color: var(--ivory); font-weight: 600; }
+.feed .d { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-right: 6px; }
+
+/* ---------- toggles & settings ---------- */
+.togglerow { display: flex; align-items: center; gap: 10px; padding: 8px 2px; font-size: 13px; border-bottom: 1px solid #24262c; }
+.togglerow:last-child { border-bottom: none; }
+.togglerow .n { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-left: auto; }
+.sw { width: 34px; height: 20px; border-radius: 999px; background: #2b2d34; position: relative; flex: none; border: 1px solid var(--line); }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2.5px; width: 14px; height: 14px; border-radius: 50%; background: #565963; }
+.sw.on { background: rgba(91,127,166,0.35); border-color: var(--brass-lo); }
+.sw.on::after { left: auto; right: 2.5px; background: var(--brass-hi); }
+.slider { height: 5px; border-radius: 3px; background: #2b2d34; position: relative; flex: 1; }
+.slider b { position: absolute; top: -4.5px; width: 14px; height: 14px; border-radius: 50%; background: var(--brass-hi); }
+.slider i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--brass-lo); }
+.sechead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 700; margin: 8px 2px 3px; }
+.sheettitle { font-size: 19px; font-weight: 700; letter-spacing: 0.01em; }
+
+/* ---------- ratings radar ---------- */
+.radar { width: 100%; }
+.radar .ring { fill: none; stroke-width: 1.4; stroke-opacity: 0.25; }
+.radar .spoke { stroke: #2b2e36; stroke-width: 1; }
+.radar .poly { fill: rgba(91,127,166,0.28); stroke: var(--brass-hi); stroke-width: 1.5; }
+.radar .vx { stroke: #14151a; stroke-width: 1; }
+.radar .dl { font-family: var(--ui); font-size: 11.5px; font-weight: 700; fill: var(--ivory); }
+.radar .dv { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
+
+/* ---------- streak & league chips & axis ladder ---------- */
+.streak7 { display: flex; align-items: center; gap: 3px; }
+.streak7 i { width: 11px; height: 11px; border-radius: 3px; background: #23252b; }
+.streak7 i.on { background: var(--brass); }
+.streak7 i.tod { background: var(--brass-hi); }
+.streak7 b { font-family: var(--mono); font-size: 10.5px; font-weight: 600; color: var(--muted); margin-left: 6px; }
+.chip.big { font-size: 12.5px; padding: 4px 12px; }
+.chip.lgG { color: #e2c565; border-color: rgba(226,197,101,0.45); background: none; }
+.chip.lgS { color: #c9cdd4; border-color: rgba(201,205,212,0.4); background: none; }
+.chip.lgB { color: #d29a6b; border-color: rgba(210,154,107,0.4); background: none; }
+.axpanel { display: flex; flex-direction: column; gap: 7px; }
+.axrow { display: grid; grid-template-columns: 52px 1fr 46px; gap: 10px; align-items: center; }
+.axrow .an { font-size: 11px; color: var(--muted); }
+.axtrack { display: flex; gap: 2.5px; }
+.axtrack i { flex: 1; height: 7px; border-radius: 3px; background: #23252b; }
+.axtrack i.p { opacity: 0.45; }
+/* rank ramp: green → red → pink across F→SSS; one flat color per chip */
+.axtrack i.ax1 { background: #58b573; } .axtrack i.ax2 { background: #7fae5e; }
+.axtrack i.ax3 { background: #a8a44e; } .axtrack i.ax4 { background: #c19245; }
+.axtrack i.ax5 { background: #cd7544; } .axtrack i.ax6 { background: #d0584e; }
+.axtrack i.ax7 { background: #d05a75; } .axtrack i.ax8 { background: #cf6f9a; }
+.axtrack i.ax9 { background: #d98ab8; }
+.axrow .rk { font-family: var(--mono); font-size: 11px; color: var(--ivory); text-align: right; }
+.axrow .rk em { font-style: normal; color: var(--good); font-size: 9px; margin-left: 2px; }
+
+/* ---------- variant cards (drill-down: buttons with previews) ---------- */
+.vargrid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.varcard { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 8px;
+  display: flex; flex-direction: column; gap: 6px; }
+.varcard.span2 { grid-column: span 2; }
+.varcard .vt { font-size: 12.5px; font-weight: 700; }
+.varcard .vt small { float: right; font-family: var(--mono); font-size: 9.5px; font-weight: 400; color: var(--faint); margin-top: 2px; }
+.varcard .vprev { background: #17181d; border-radius: 8px; padding: 6px 8px; min-height: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 8px; overflow: hidden; }
+.varcard .vprev.paper { background: linear-gradient(176deg, var(--paper-hi), var(--paper-lo)); }
+.varcard .vprev .sym { font-family: var(--disp); font-size: 19px; white-space: nowrap; }
+.varcard .vprev .sym small { font-size: 1em; color: inherit; vertical-align: 0; }
+
+/* mode/teach chips sit right, beside the device chip */
+.statusrow > .chip { margin-left: auto; }
+.statusrow > .chip + .devchip { margin-left: 10px; }
+
+/* block-transition interstitial */
+.interstitial { display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 22px 0 10px; text-align: center; }
+.interstitial .upnext { font-size: 12px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--faint); font-weight: 700; }
+.interstitial .bigname { font-family: var(--disp); font-size: 46px; line-height: 1; }
+.interstitial .intsub { font-size: 12.5px; color: var(--muted); }
+.interstitial .intline { font-size: 11px; color: var(--faint); }
+.varcard .vprev svg { display: block; width: 100%; height: auto; }
+.varcard .vprev .half { width: 48%; }
+.minichips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.minichips span { border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; font-size: 10px; color: var(--muted); background: var(--surface-hi); }
+.minichips span.sel { border-color: var(--brass); color: var(--brass-hi); }
+
+/* ---------- progression node grid ---------- */
+.progtbl { display: grid; grid-template-columns: 74px repeat(6, 1fr); row-gap: 8px; column-gap: 3px; align-items: center; }
+.progtbl .ph { font-size: 9.5px; line-height: 1.2; text-align: center; color: var(--faint); }
+.progtbl .pl { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+.nd { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #3a4250; margin: 0 auto; }
+.nd.done { background: #3a4a5c; border-color: #3a4a5c; }
+.nd.now { background: var(--brass-hi); border-color: var(--brass-hi); width: 13px; height: 13px; }
+
+/* ---------- family column (single-column home list) ---------- */
+.famcol { display: flex; flex-direction: column; }
+.famrow { display: flex; align-items: baseline; gap: 10px; padding: 13px 2px; border-bottom: 1px solid #24262c; }
+.famrow:last-child { border-bottom: none; }
+.famrow .nm { font-size: 15.5px; font-weight: 700; white-space: nowrap; }
+.famrow .sub { font-size: 11.5px; color: var(--faint); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.famrow .meta { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.famrow .meta.hot { color: var(--ivory); font-weight: 600; }
+.famrow.unex .nm, .famrow.unex .meta { color: var(--faint); }
+.famrow.offd2 { opacity: 0.5; }
+
+/* ---------- misc ---------- */
+.segrail { display: flex; gap: 5px; }
+.segrail span { flex: 1; text-align: center; font-size: 10px; padding: 5px 0; border-radius: 7px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--faint); font-weight: 700; letter-spacing: 0.04em; }
+.segrail span.done { color: var(--good); border-color: rgba(88,181,115,0.4); }
+.segrail span.now { color: var(--brass-hi); border-color: rgba(91,127,166,0.5); background: rgba(91,127,166,0.08); }
+.tagchips { display: flex; gap: 6px; flex-wrap: wrap; }
+.tagchips .chip { font-family: var(--mono); font-size: 10px; padding: 2px 8px; }
+.bigbtns { display: flex; gap: 10px; }
+.notecard { border-left: 3px solid var(--brass); padding: 8px 12px; background: var(--surface); border-radius: 8px; }
+.notecard ul { margin: 4px 0 0; padding-left: 16px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+.notecard .h { font-size: 11px; color: var(--brass-hi); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.ghostnext { border-radius: 8px; border: 1px dashed #3a3c43; padding: 4px 8px; color: var(--faint);
+  font-size: 10.5px; font-family: var(--disp); font-style: italic; text-align: center; }
+.blockcard { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 12px; background: linear-gradient(180deg, var(--surface-hi), var(--surface)); font-size: 13px; }
+.blockcard .drag { color: var(--faint); font-family: var(--mono); letter-spacing: -1px; }
+.blockcard .bound { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--brass-hi); }
+.divider { height: 1px; background: var(--line); margin: 2px 0; }
+.kv { display: flex; font-size: 12.5px; color: var(--muted); gap: 8px; }
+.kv b { color: var(--ivory); font-weight: 600; }
+.kv .v { margin-left: auto; font-family: var(--mono); font-size: 11.5px; }
+
+</style></head>
+<body>
+<script>
+// Prima Volta mockups — keyboard renderer v2 (ebony/ivory look, felt strip, LED states).
+// kbd(svgEl, "C3", "E5", { "Ab3": "ok" }, { labels: ["Ab3"], path: ["G3","B3"] })
+(function () {
+  const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const BLACK = new Set([1, 3, 6, 8, 10]);
+  const NS = "http://www.w3.org/2000/svg";
+  function toMidi(name) {
+    const m = /^([A-G])([#b]?)(-?\d)$/.exec(name);
+    if (!m) throw new Error("bad note " + name);
+    return (parseInt(m[3], 10) + 1) * 12 + PC[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0);
+  }
+  const LED = { ok: "#58b573", err: "#d9564c", exp: "#82a6cb" };
+  let uidCounter = 0;
+
+  window.kbd = function (el, lo, hi, states, opts) {
+    states = states || {}; opts = opts || {};
+    const loM = toMidi(lo), hiM = toMidi(hi);
+    const st = {}; Object.keys(states).forEach(k => { st[toMidi(k)] = states[k]; });
+    const labels = new Map((opts.labels || []).map(n => [toMidi(n), n.replace("b", "♭").replace("#", "♯")]));
+    const path = (opts.path || []).map(toMidi);
+
+    const whites = [];
+    for (let m = loM; m <= hiM; m++) if (!BLACK.has(m % 12)) whites.push(m);
+    const W = 378 / whites.length, FELT = 6, TOP = FELT + 1, H = 116, BH = H * 0.60, BW = Math.min(W * 0.62, 22);
+    const hasLab = labels.size > 0;
+    el.setAttribute("viewBox", "0 0 378 " + (TOP + H + (hasLab ? 16 : 4)));
+
+    function make(tag, attrs, parent) {
+      const n = document.createElementNS(NS, tag);
+      for (const k in attrs) n.setAttribute(k, attrs[k]);
+      (parent || el).appendChild(n); return n;
+    }
+    // defs: ivory + ebony gradients, drawn once per svg
+    const defs = make("defs", {});
+    const uid = "g" + (++uidCounter) + "x";
+    function grad(id, stops) {
+      const g = make("linearGradient", { id: uid + id, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+      stops.forEach(([o, c]) => make("stop", { offset: o, "stop-color": c }, g));
+    }
+    grad("wk", [["0%", "#fbf9f2"], ["78%", "#efeadd"], ["100%", "#e2dccb"]]);
+    grad("wkok", [["0%", "#e7f5ea"], ["100%", "#c9e6d0"]]);
+    grad("wkerr", [["0%", "#f8e4e1"], ["100%", "#ecc7c2"]]);
+    grad("bk", [["0%", "#3a3c44"], ["16%", "#191a1f"], ["100%", "#0b0c0f"]]);
+    grad("bkok", [["0%", "#3f7a52"], ["100%", "#1e3c29"]]);
+    grad("bkerr", [["0%", "#a04a42"], ["100%", "#55201c"]]);
+    grad("felt", [["0%", "#c14a42"], ["100%", "#8e2b26"]]);
+
+    make("rect", { x: 0, y: 0, width: 378, height: FELT, rx: 2, fill: "url(#" + uid + "felt)" }); // the felt strip
+
+    const fillFor = (base, s) => "url(#" + uid + (s === "ok" ? base + "ok" : s === "err" ? base + "err" : base) + ")";
+    const xOf = {};
+    whites.forEach((m, i) => {
+      const s = st[m];
+      xOf[m] = i * W;
+      make("rect", { x: i * W + 0.6, y: TOP, width: W - 1.2, height: H, rx: 3.2, fill: fillFor("wk", s), stroke: "#0c0d10", "stroke-width": 1 });
+      if (s && LED[s]) make("rect", { x: i * W + W * 0.22, y: TOP + H - 9, width: W * 0.56, height: 4.5, rx: 2.2, fill: LED[s], style: "filter: drop-shadow(0 0 4px " + LED[s] + ")" });
+      if (s === "exp") make("rect", { x: i * W + 1.8, y: TOP + 1.2, width: W - 3.6, height: H - 2.4, rx: 3, fill: "none", stroke: LED.exp, "stroke-width": 1.6, "stroke-dasharray": "4 3" });
+      if (labels.has(m)) make("text", { x: i * W + W / 2, y: TOP + H + 12, class: "keylab" }).textContent = labels.get(m);
+    });
+    whites.forEach((m, i) => {
+      const bm = m + 1;
+      if (bm <= hiM && BLACK.has(bm % 12)) {
+        const s = st[bm], bx = (i + 1) * W - BW / 2;
+        make("rect", { x: bx, y: TOP, width: BW, height: BH, rx: 2.6, fill: fillFor("bk", s), stroke: "#000", "stroke-width": 0.8 });
+        make("rect", { x: bx + 2.2, y: TOP + 2, width: BW - 4.4, height: 5, rx: 2, fill: "rgba(255,255,255,0.14)" }); // sheen
+        if (s && LED[s]) make("rect", { x: bx + BW * 0.2, y: TOP + BH - 8, width: BW * 0.6, height: 3.8, rx: 1.9, fill: LED[s], style: "filter: drop-shadow(0 0 4px " + LED[s] + ")" });
+        if (s === "exp") make("rect", { x: bx + 1, y: TOP + 1, width: BW - 2, height: BH - 2, rx: 2.4, fill: "none", stroke: LED.exp, "stroke-width": 1.5, "stroke-dasharray": "4 3" });
+        xOf[bm] = bx + BW / 2 - W / 2;
+        if (labels.has(bm)) make("text", { x: (i + 1) * W, y: TOP + H + 12, class: "keylab" }).textContent = labels.get(bm);
+      }
+    });
+    path.forEach((m, i) => {
+      const isB = BLACK.has(m % 12);
+      const cx = xOf[m] + W / 2, cy = isB ? TOP + BH - 16 : TOP + H - 20;
+      make("circle", { cx, cy, r: 7.5, class: "pathdot", style: "filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5))" });
+      make("text", { x: cx, y: cy + 3.2, class: "pathnum" }).textContent = (opts.fingers && opts.fingers[i]) || String(i + 1);
+    });
+  };
+
+  // KeyPicker wheel: circle of fifths. keywheel(el, { selected: "E" }) — majors ring;
+  // { minor: true, selectedMinor: "c" } adds the inner minor ring, relative pairs aligned.
+  window.keywheel = function (el, opts) {
+    opts = opts || {};
+    const KEYS = ["C", "G", "D", "A", "E", "B", "F♯", "D♭", "A♭", "E♭", "B♭", "F"];
+    const MINS = ["a", "e", "b", "f♯", "c♯", "g♯", "d♯", "b♭", "f", "c", "g", "d"];
+    const SUBS = ["", "1♯", "2♯", "3♯", "4♯", "5♯", "6♯", "5♭", "4♭", "3♭", "2♭", "1♭"];
+    const C = 130;
+    el.setAttribute("viewBox", "0 0 260 260");
+    function make(tag, attrs) {
+      const n = document.createElementNS(NS, tag);
+      for (const k in attrs) n.setAttribute(k, attrs[k]);
+      el.appendChild(n); return n;
+    }
+    function pt(r, aDeg) { const a = (aDeg - 90) * Math.PI / 180; return [C + r * Math.cos(a), C + r * Math.sin(a)]; }
+    function ring(R1, R2, labels, labelCls, selected, subs) {
+      labels.forEach((k, i) => {
+        const a0 = i * 30 - 15 + 1.4, a1 = i * 30 + 15 - 1.4;
+        const [x0o, y0o] = pt(R2, a0), [x1o, y1o] = pt(R2, a1);
+        const [x0i, y0i] = pt(R1, a0), [x1i, y1i] = pt(R1, a1);
+        make("path", {
+          d: "M " + x0o + " " + y0o + " A " + R2 + " " + R2 + " 0 0 1 " + x1o + " " + y1o +
+             " L " + x1i + " " + y1i + " A " + R1 + " " + R1 + " 0 0 0 " + x0i + " " + y0i + " Z",
+          class: "seg" + (k === selected ? " " + (opts.state || "ok") : ""),
+        });
+        const [lx, ly] = pt((R1 + R2) / 2 + (subs ? 3 : 1), i * 30);
+        make("text", { x: lx, y: ly + 1, class: labelCls }).textContent = k;
+        if (subs && subs[i]) make("text", { x: lx, y: ly + 14, class: "segsub" }).textContent = subs[i];
+      });
+    }
+    if (opts.minorOnly) { // question state for minor prompts: only the asked mode's ring, full size
+      ring(66, 122, MINS, "seglab min", opts.selected, null);
+      make("text", { x: C, y: C + 4, class: "wheelhint" }).textContent = opts.hint || "tap the key";
+    } else if (opts.minor) { // dual ring: the confirmation/reveal state
+      ring(80, 122, KEYS, "seglab", opts.selected, null);
+      ring(38, 76, MINS, "seglab min", opts.selectedMinor, null);
+    } else {
+      ring(66, 122, KEYS, "seglab", opts.selected, SUBS);
+      make("text", { x: C, y: C + 4, class: "wheelhint" }).textContent = opts.hint || "tap the key";
+    }
+  };
+
+  // Real engraving via embedded VexFlow (the production renderer, dogfooded).
+  // vf(el, { key, time, clef, measures: [ {notes:[{k:["g/4"],d:"q",acc:["#"],style:"#c00"}]} | {} ] })
+  // vf(el, { grand: true, key, time, treble: [measures], bass: [measures] })
+  window.vf = function (el, opts) {
+    const F = Vex.Flow;
+    const width = opts.width || 344;
+    const grand = !!opts.grand;
+    const height = opts.height || (grand ? 212 : 122);
+    const r = new F.Renderer(el, F.Renderer.Backends.SVG);
+    r.resize(width, height);
+    const ctx = r.getContext();
+    function drawLine(measures, y, clef) {
+      let x = 6;
+      const total = width - 12;
+      const firstExtra = 58 + (opts.key ? 14 : 0) + (opts.time ? 14 : 0);
+      const baseW = (total - firstExtra) / measures.length;
+      return measures.map((m, i) => {
+        const w = baseW + (i === 0 ? firstExtra : 0);
+        const st = new F.Stave(x, y, w);
+        if (i === 0) {
+          if (clef) st.addClef(clef);
+          if (opts.key) st.addKeySignature(opts.key);
+          if (opts.time) st.addTimeSignature(opts.time);
+        }
+        st.setContext(ctx).draw();
+        const specs = m.notes || [];
+        if (specs.length) {
+          const ns = specs.map(sp => {
+            const n = new F.StaveNote({ clef: clef || "treble", keys: sp.k, duration: sp.d });
+            (sp.acc || []).forEach((a, ix) => { if (a) n.addModifier(new F.Accidental(a), ix); });
+            if (sp.style) n.setStyle({ fillStyle: sp.style, strokeStyle: sp.style });
+            return n;
+          });
+          const beams = F.Beam.generateBeams(ns);
+          const v = new F.Voice({ num_beats: 4, beat_value: 4 });
+          v.setMode(F.Voice.Mode.SOFT);
+          v.addTickables(ns);
+          new F.Formatter().joinVoices([v]).formatToStave([v], st);
+          v.draw(ctx, st);
+          beams.forEach(b => b.setContext(ctx).draw());
+        }
+        x += w;
+        return st;
+      });
+    }
+    let tops, bots;
+    if (grand) {
+      tops = drawLine(opts.treble, 4, "treble");
+      bots = drawLine(opts.bass, 100, "bass");
+      const conn = (a, b, type) => new F.StaveConnector(a, b).setType(type).setContext(ctx).draw();
+      conn(tops[0], bots[0], F.StaveConnector.type.BRACE);
+      conn(tops[0], bots[0], F.StaveConnector.type.SINGLE_LEFT);
+      conn(tops[tops.length - 1], bots[bots.length - 1], F.StaveConnector.type.SINGLE_RIGHT);
+      for (let i = 1; i < tops.length; i++) conn(tops[i], bots[i], F.StaveConnector.type.SINGLE_LEFT);
+    } else {
+      drawLine(opts.measures, 14, opts.clef || "treble");
+    }
+    const svg = el.querySelector("svg");
+    if (svg) {
+      svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+      svg.removeAttribute("width"); svg.removeAttribute("height");
+      svg.style.width = "100%"; svg.style.height = "auto";
+    }
+  };
+
+  // SignaturePicker cell: engraved mini-signature. sigcell(el, "5s"|"3f"|"0", "treble"|"bass")
+  window.sigcell = function (el, spec, clef) {
+    clef = clef || "treble";
+    const n = parseInt(spec, 10) || 0, type = spec.slice(-1);
+    const POS = { // SMuFL registration: em = staff height (32px here); baseline on the clef's home line
+      treble: { s: [0, 3, -1, 2, 5, 1, 4], f: [4, 1, 5, 2, 6], glyph: "𝄞", gs: 32, gy: 37 },
+      bass:   { s: [2, 5, 1, 4, 7, 3, 6], f: [6, 3, 7, 4, 8], glyph: "𝄢", gs: 32, gy: 21 },
+    }[clef];
+    el.setAttribute("viewBox", "0 0 112 62");
+    function make(tag, attrs) {
+      const el2 = document.createElementNS(NS, tag);
+      for (const k in attrs) el2.setAttribute(k, attrs[k]);
+      el.appendChild(el2); return el2;
+    }
+    for (let i = 0; i < 5; i++)
+      make("line", { x1: 4, y1: 13 + i * 8, x2: 108, y2: 13 + i * 8, stroke: "#494b52", "stroke-width": 1 });
+    make("text", { x: 3, y: POS.gy, style: "font-family:'Bravura Text','Noto Music','Segoe UI Symbol',serif;font-size:" + POS.gs + "px", fill: "#1e1f24" }).textContent = POS.glyph;
+    const positions = type === "f" ? POS.f : POS.s;
+    for (let i = 0; i < n; i++)
+      make("text", { x: 27 + i * 12, y: 13 + positions[i] * 4, style: "font-family:'Bravura Text','Noto Music','Segoe UI Symbol',serif;font-size:32px", fill: "#1e1f24" }).textContent = type === "f" ? "♭" : "♯";
+  };
+})();
+
+</script>
+<!-- F10 · Sight-reading passages — Prima Volta mockups -->
+<header class="page"><h1>F10 · Sight-reading passages</h1>
+<p>Spec: <code>../F10-passages.md</code> · Preview ritual → one pass in either mode → three-axis results. Generated, never repeated. Notation engraved by embedded VexFlow.</p></header>
+
+<div class="grouphead">preview ritual</div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · L4·b · 2/4<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard locked"><span class="lockchip">keys locked</span><div class="vfbox" id="pv"></div></div>
+      </div>
+      <div class="rightcol">
+        <div class="ring"><div class="r"><span>22s</span></div><span>scan the score</span></div>
+        <div class="sheet" style="padding:10px">
+          <p class="grouplab" style="margin-bottom:6px">Before keys unlock</p>
+          <div class="chips" style="grid-template-columns:1fr">
+            <div class="choice ok">Key? — D major</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Preview ritual.</b> Score dimmed and locked; one scan question per read — key, meter, or largest leap, computed from the actual score — must be answered before the keys unlock.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">one pass · two modes <small>~3 rehearsal reads : 1 performance read</small></div>
+<div class="row">
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · L4·b · 2/4<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard"><div class="vfbox" id="pr"></div></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback info">Paused on the LH shift — take your time</div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Rehearsal read — the daily default.</b> No metronome at your own pace; stopping and self-correcting are tolerated. The pause is recorded as a <code>hesitation</code> event (diagnosis data) but costs nothing — accuracy-first, per the don't-drill-mistakes philosophy.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · L4·b · 3/7<span class="chip perf">Performance</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard"><div class="vfbox" id="pp"></div><div class="curband" style="left:16%;width:42%"></div></div>
+      </div>
+      <div class="rightcol">
+        <div class="metro"><i></i><i class="on"></i><i></i><i></i><span>♩ = 76 · bar 1</span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Performance read</b> — benchmark excerpts and ~1 in 4 daily reads. Locked pulse — the bar won't wait; continuity now counts. The brass band marks the current bar; noteheads color as graded (green hit, red miss) without stopping the take.</figcaption>
+</figure>
+
+</div>
+
+<div class="grouphead">results</div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READ COMPLETE<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="axes">
+        <div class="axis"><span>Pitch</span><div class="bar"><i style="width:94%"></i></div><span class="val">94</span></div>
+        <div class="axis"><span>Rhythm</span><div class="bar"><i style="width:88%"></i></div><span class="val">88</span></div>
+        <div class="axis na"><span>Continuity</span><div class="bar"></div><span class="val">logged</span></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback info">2 issues · both in bar 2 — the LH shift to B2</div>
+        <div class="footerbar"><div class="btn">Replay my take</div><div class="btn primary">Read another</div></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Results.</b> Three axes reported separately per 03 — they never blend, and continuity stays data-only in rehearsal mode. The error cluster gets a one-tap "drill this" that materializes a prescription (an F9 shift stream here). "Replay my take" plays back the performed MIDI.</figcaption>
+</figure>
+</div>
+
+<script>
+const PASSAGE = {
+  grand: true, key: "D", time: "4/4",
+  treble: [
+    { notes: [{ k: ["d/5"], d: "q" }, { k: ["c#/5"], d: "q" }, { k: ["b/4"], d: "8" }, { k: ["a/4"], d: "8" }, { k: ["g/4"], d: "q" }] },
+    { notes: [{ k: ["f#/4"], d: "q" }, { k: ["e/4"], d: "q" }, { k: ["d/4"], d: "h" }] },
+  ],
+  bass: [
+    { notes: [{ k: ["d/3"], d: "h" }, { k: ["a/2"], d: "h" }] },
+    { notes: [{ k: ["b/2"], d: "h" }, { k: ["a/2"], d: "q" }, { k: ["f#/2"], d: "q" }] },
+  ],
+};
+vf(document.getElementById("pv"), PASSAGE);
+vf(document.getElementById("pr"), PASSAGE);
+const OK = "#2f7d4a", ERR = "#c0392f";
+vf(document.getElementById("pp"), {
+  grand: true, key: "D", time: "4/4",
+  treble: [
+    { notes: [{ k: ["d/5"], d: "q", style: OK }, { k: ["c#/5"], d: "q", style: OK }, { k: ["b/4"], d: "8", style: OK }, { k: ["a/4"], d: "8", style: ERR }, { k: ["g/4"], d: "q" }] },
+    { notes: [{ k: ["f#/4"], d: "q" }, { k: ["e/4"], d: "q" }, { k: ["d/4"], d: "h" }] },
+  ],
+  bass: [
+    { notes: [{ k: ["d/3"], d: "h", style: OK }, { k: ["a/2"], d: "h", style: OK }] },
+    { notes: [{ k: ["b/2"], d: "h" }, { k: ["a/2"], d: "q" }, { k: ["f#/2"], d: "q" }] },
+  ],
+});
+</script>
+
+</body></html>

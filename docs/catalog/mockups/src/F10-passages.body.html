@@ -1,0 +1,111 @@
+<!-- F10 · Sight-reading passages — Prima Volta mockups -->
+<header class="page"><h1>F10 · Sight-reading passages</h1>
+<p>Spec: <code>../F10-passages.md</code> · Preview ritual → one pass in either mode → three-axis results. Generated, never repeated. Notation engraved by embedded VexFlow.</p></header>
+
+<div class="grouphead">preview ritual</div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · L4·b · 2/4<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard locked"><span class="lockchip">keys locked</span><div class="vfbox" id="pv"></div></div>
+      </div>
+      <div class="rightcol">
+        <div class="ring"><div class="r"><span>22s</span></div><span>scan the score</span></div>
+        <div class="sheet" style="padding:10px">
+          <p class="grouplab" style="margin-bottom:6px">Before keys unlock</p>
+          <div class="chips" style="grid-template-columns:1fr">
+            <div class="choice ok">Key? — D major</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Preview ritual.</b> Score dimmed and locked; one scan question per read — key, meter, or largest leap, computed from the actual score — must be answered before the keys unlock.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">one pass · two modes <small>~3 rehearsal reads : 1 performance read</small></div>
+<div class="row">
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · L4·b · 2/4<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard"><div class="vfbox" id="pr"></div></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback info">Paused on the LH shift — take your time</div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Rehearsal read — the daily default.</b> No metronome at your own pace; stopping and self-correcting are tolerated. The pause is recorded as a <code>hesitation</code> event (diagnosis data) but costs nothing — accuracy-first, per the don't-drill-mistakes philosophy.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · L4·b · 3/7<span class="chip perf">Performance</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard"><div class="vfbox" id="pp"></div><div class="curband" style="left:16%;width:42%"></div></div>
+      </div>
+      <div class="rightcol">
+        <div class="metro"><i></i><i class="on"></i><i></i><i></i><span>♩ = 76 · bar 1</span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Performance read</b> — benchmark excerpts and ~1 in 4 daily reads. Locked pulse — the bar won't wait; continuity now counts. The brass band marks the current bar; noteheads color as graded (green hit, red miss) without stopping the take.</figcaption>
+</figure>
+
+</div>
+
+<div class="grouphead">results</div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READ COMPLETE<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="axes">
+        <div class="axis"><span>Pitch</span><div class="bar"><i style="width:94%"></i></div><span class="val">94</span></div>
+        <div class="axis"><span>Rhythm</span><div class="bar"><i style="width:88%"></i></div><span class="val">88</span></div>
+        <div class="axis na"><span>Continuity</span><div class="bar"></div><span class="val">logged</span></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback info">2 issues · both in bar 2 — the LH shift to B2</div>
+        <div class="footerbar"><div class="btn">Replay my take</div><div class="btn primary">Read another</div></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Results.</b> Three axes reported separately per 03 — they never blend, and continuity stays data-only in rehearsal mode. The error cluster gets a one-tap "drill this" that materializes a prescription (an F9 shift stream here). "Replay my take" plays back the performed MIDI.</figcaption>
+</figure>
+</div>
+
+<script>
+const PASSAGE = {
+  grand: true, key: "D", time: "4/4",
+  treble: [
+    { notes: [{ k: ["d/5"], d: "q" }, { k: ["c#/5"], d: "q" }, { k: ["b/4"], d: "8" }, { k: ["a/4"], d: "8" }, { k: ["g/4"], d: "q" }] },
+    { notes: [{ k: ["f#/4"], d: "q" }, { k: ["e/4"], d: "q" }, { k: ["d/4"], d: "h" }] },
+  ],
+  bass: [
+    { notes: [{ k: ["d/3"], d: "h" }, { k: ["a/2"], d: "h" }] },
+    { notes: [{ k: ["b/2"], d: "h" }, { k: ["a/2"], d: "q" }, { k: ["f#/2"], d: "q" }] },
+  ],
+};
+vf(document.getElementById("pv"), PASSAGE);
+vf(document.getElementById("pr"), PASSAGE);
+const OK = "#2f7d4a", ERR = "#c0392f";
+vf(document.getElementById("pp"), {
+  grand: true, key: "D", time: "4/4",
+  treble: [
+    { notes: [{ k: ["d/5"], d: "q", style: OK }, { k: ["c#/5"], d: "q", style: OK }, { k: ["b/4"], d: "8", style: OK }, { k: ["a/4"], d: "8", style: ERR }, { k: ["g/4"], d: "q" }] },
+    { notes: [{ k: ["f#/4"], d: "q" }, { k: ["e/4"], d: "q" }, { k: ["d/4"], d: "h" }] },
+  ],
+  bass: [
+    { notes: [{ k: ["d/3"], d: "h", style: OK }, { k: ["a/2"], d: "h", style: OK }] },
+    { notes: [{ k: ["b/2"], d: "h" }, { k: ["a/2"], d: "q" }, { k: ["f#/2"], d: "q" }] },
+  ],
+});
+</script>

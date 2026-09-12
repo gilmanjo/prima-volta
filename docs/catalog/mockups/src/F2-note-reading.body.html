@@ -1,0 +1,253 @@
+<!-- F2 · Note reading — Prima Volta mockups -->
+<header class="page"><h1>F2 · Note reading</h1>
+<p>Spec: <code>../F2-note-reading.md</code> · Tier ladder T0–T5, the grand-staff dimension, and the NoteSelector widget. Register bands, clefs, and key contexts are separate atoms.</p></header>
+
+<div class="grouphead">staff→midi · tier ladder</div>
+<div class="row">
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">NOTE READING · 1/6<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play this note</div>
+        <div class="scorecard" style="margin-top:8px"><svg viewBox="0 0 360 108">
+          <g class="stave">
+            <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+            <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+            <line x1="8" y1="66" x2="352" y2="66"/>
+            <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+          </g>
+          <text class="mus clef bass" x="16" y="36">𝄢</text>
+          <line class="ledger" x1="168" y1="76" x2="196" y2="76"/>
+          <line class="ledger" x1="168" y1="86" x2="196" y2="86"/>
+          <ellipse class="notehead" cx="182" cy="86" rx="6.4" ry="4.6"/>
+          <line class="stem" x1="188.4" y1="86" x2="188.4" y2="54"/>
+        </svg></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback bad">Right letter, wrong octave — that's C3; this is C2</div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t0"></svg></div>
+    <div class="footerbar"><div class="btn">Replay yours vs expected</div><div class="btn primary">Play the correct answer to continue</div></div>
+    <div class="hintline">…or tap anywhere to continue</div>
+  </div>
+  <figcaption><b>T0 — on-staff plus one to two ledger lines,</b> one consolidated band per clef (the middle-C zone included on grand staff). Octave-strict from the first rep: playing C3 for C2 logs <code>wrongOctave</code> + <code>ledger:below-bass</code>. The flow stops for reconciliation — expected (brass dashed) vs played (red LED) on the keybed; continue by playing the correct answer, or tap through.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">NOTE READING · 2/6<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play this note</div>
+        <div class="scorecard" style="margin-top:8px"><svg viewBox="0 0 360 100">
+          <g class="stave">
+            <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+            <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+            <line x1="8" y1="66" x2="352" y2="66"/>
+            <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+          </g>
+          <text class="mus clef" x="14" y="60">𝄞</text>
+          <text class="mus acc" x="158" y="33">♯</text>
+          <ellipse class="notehead" cx="182" cy="26" rx="6.4" ry="4.6"/>
+          <line class="stem" x1="175.6" y1="26" x2="175.6" y2="58"/>
+        </svg></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback good">F♯5 <span class="lat">1.2s · Good</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t1"></svg></div>
+  </div>
+  <figcaption><b>T1 — inline accidentals</b> (♯/♭, then courtesy naturals), ahead of the deep ledger zones. MIDI grades the sounding pitch; spelling is the NoteSelector's job.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">NOTE READING · 3/6<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play this note</div>
+        <div class="scorecard" style="margin-top:8px"><svg viewBox="0 0 360 100">
+          <g class="stave">
+            <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+            <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+            <line x1="8" y1="66" x2="352" y2="66"/>
+            <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+          </g>
+          <text class="mus clef" x="14" y="60">𝄞</text>
+          <text class="mus acc" x="58" y="32">♯</text><text class="mus acc" x="74" y="47">♯</text>
+          <ellipse class="notehead" cx="192" cy="61" rx="6.4" ry="4.6"/>
+          <line class="stem" x1="198.4" y1="61" x2="198.4" y2="29"/>
+        </svg></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback good">F♯4 — the signature applies <span class="lat">1.6s · Good</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t2"></svg></div>
+  </div>
+  <figcaption><b>T2 — key signatures.</b> Two sharps, no inline mark: the F space <i>is</i> F♯. The most common real-reading condition, finally drilled directly — and the tier where F1's signature knowledge becomes reading behavior. Playing F♮ here logs a <code>key:D</code> misread.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">NOTE READING · 4/6<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play this note</div>
+        <div class="scorecard" style="margin-top:8px"><svg viewBox="0 -14 360 114">
+          <g class="stave">
+            <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+            <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+            <line x1="8" y1="66" x2="352" y2="66"/>
+            <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+          </g>
+          <text class="mus clef" x="14" y="60">𝄞</text>
+          <line class="ledger" x1="168" y1="16" x2="196" y2="16"/>
+          <line class="ledger" x1="168" y1="6" x2="196" y2="6"/>
+          <line class="ledger" x1="168" y1="-4" x2="196" y2="-4"/>
+          <ellipse class="notehead" cx="182" cy="-4" rx="6.4" ry="4.6"/>
+          <line class="stem" x1="175.6" y1="-4" x2="175.6" y2="28"/>
+        </svg></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback good">E6 <span class="lat">1.7s · Good</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t3"></svg></div>
+  </div>
+  <figcaption><b>T3 — deep ledger lines (3+).</b> The dead zones, each register band its own atom so weakness stays addressable. (8va/8vb: tabled as a follow-up add-on.)</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">NOTE READING · 5/6<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play this note</div>
+        <div class="scorecard" style="margin-top:8px"><svg viewBox="0 0 360 100">
+          <g class="stave">
+            <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+            <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+            <line x1="8" y1="66" x2="352" y2="66"/>
+            <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+          </g>
+          <text class="mus clef" x="14" y="60">𝄞</text>
+          <text class="mus acc" x="154" y="67">𝄪</text>
+          <ellipse class="notehead" cx="182" cy="61" rx="6.4" ry="4.6"/>
+          <line class="stem" x1="188.4" y1="61" x2="188.4" y2="29"/>
+        </svg></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback good">F<span class="mus-inline">𝄪</span>4 — sounds as G <span class="lat">2.3s · Good</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t4"></svg></div>
+  </div>
+  <figcaption><b>T4 — double accidentals</b> (<span class="mus-inline">𝄪</span>, <span class="mus-inline">𝄫</span> — sharp-key harmonic-minor territory). MIDI accepts the sounding key (G here); the NoteSelector variant is where F<span class="mus-inline">𝄪</span>-vs-G spelling gets graded.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">NOTE READING · speeded · 6/6<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard"><svg viewBox="0 0 360 100">
+          <g class="stave">
+            <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+            <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+            <line x1="8" y1="66" x2="352" y2="66"/>
+            <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+          </g>
+          <text class="mus clef" x="14" y="60">𝄞</text>
+          <ellipse class="notehead" cx="182" cy="41" rx="6.4" ry="4.6"/>
+          <line class="stem" x1="175.6" y1="41" x2="175.6" y2="73"/>
+        </svg></div>
+      </div>
+      <div class="rightcol">
+        <div class="ring"><div class="r"><span>1.5s</span></div><span>flash…</span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>T5 — speeded.</b> The display timer becomes the difficulty knob (1.5s → 0.4s as the band matures); mechanically this converges with F8's flash drills.</figcaption>
+</figure>
+
+</div>
+
+<div class="grouphead">grand staff <small>both staves live — a separate atom dimension</small></div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">NOTE READING · grand staff · 2/4<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play this note</div>
+        <div class="scorecard" style="margin-top:8px"><svg viewBox="0 0 360 116">
+          <g class="stave">
+            <line x1="8" y1="18" x2="352" y2="18"/><line x1="8" y1="26" x2="352" y2="26"/>
+            <line x1="8" y1="34" x2="352" y2="34"/><line x1="8" y1="42" x2="352" y2="42"/>
+            <line x1="8" y1="50" x2="352" y2="50"/>
+            <line x1="8" y1="66" x2="352" y2="66"/><line x1="8" y1="74" x2="352" y2="74"/>
+            <line x1="8" y1="82" x2="352" y2="82"/><line x1="8" y1="90" x2="352" y2="90"/>
+            <line x1="8" y1="98" x2="352" y2="98"/>
+            <line class="barline" x1="8" y1="18" x2="8" y2="98"/>
+            <line class="barline" x1="352" y1="18" x2="352" y2="98"/>
+          </g>
+          <text class="mus clef" x="14" y="46" style="font-size:32px">𝄞</text>
+          <text class="mus clef bass" x="15" y="74" style="font-size:32px">𝄢</text>
+          <ellipse class="notehead" cx="188" cy="78" rx="5.6" ry="4.1"/>
+          <line class="stem" x1="193.6" y1="78" x2="193.6" y2="50"/>
+        </svg></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback good">E3 <span class="lat">1.4s · Good</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="g1"></svg></div>
+  </div>
+  <figcaption><b>Grand staff.</b> Both staves live; the note appears in either, so the eye pays the clef-switch cost every rep — which is why grand-staff items are scheduled as their own atoms rather than treated as presentation. Clef-switch hesitations here predict the same stumbles in F10 reading.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">staff→NoteSelector <small>away-capable · where spelling is graded</small></div>
+<div class="row">
+<figure>
+  <div class="phone">
+    <div class="statusrow">NOTE READING · 5/5<span class="chip mode">Rehearsal</span><span class="devchip off"><i></i>away · no device</span></div>
+    <div class="prompt"><div class="ask">Name this note</div></div>
+    <div class="scorecard"><svg viewBox="0 0 360 100">
+      <g class="stave">
+        <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+        <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+        <line x1="8" y1="66" x2="352" y2="66"/>
+        <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+      </g>
+      <text class="mus clef" x="14" y="60">𝄞</text>
+      <line class="ledger" x1="168" y1="16" x2="196" y2="16"/>
+      <ellipse class="notehead" cx="182" cy="16" rx="6.4" ry="4.6"/>
+      <line class="stem" x1="175.8" y1="16" x2="175.8" y2="48"/>
+    </svg></div>
+    <div class="grouplab">Letter</div>
+    <div class="chips seven">
+      <div class="choice">C</div><div class="choice">D</div><div class="choice">E</div><div class="choice">F</div>
+      <div class="choice">G</div><div class="choice ok">A</div><div class="choice">B</div>
+    </div>
+    <div class="grouplab">Accidental</div>
+    <div class="chips three">
+      <div class="choice">♭</div><div class="choice ok">♮</div><div class="choice">♯</div>
+    </div>
+    <div class="grouplab">Octave</div>
+    <div class="chips seven">
+      <div class="choice">1</div><div class="choice">2</div><div class="choice">3</div><div class="choice">4</div><div class="choice ok">5</div><div class="choice">6</div><div class="choice">7</div>
+    </div>
+    <div class="feedback good">A5 <span class="lat">2.2s · Good</span></div>
+  </div>
+  <figcaption><b>The NoteSelector</b> — letter + accidental + octave rows, the full option space (no sampled choices). Register identity and spelling are both graded here: this is where F𝄪 ≠ G and E♯ ≠ F. The accidental row appears once accidentals are in scope; the octave row is contextual to the drilled bands. Choice frames keep the portrait phone.</figcaption>
+</figure>
+</div>
+
+<script>
+kbd(document.getElementById("t0"), "C2", "E3", { "C3": "err", "C2": "exp" }, {});
+kbd(document.getElementById("t1"), "C5", "C6", { "F#5": "ok" }, {});
+kbd(document.getElementById("t2"), "C4", "C5", { "F#4": "ok" }, {});
+kbd(document.getElementById("t3"), "C5", "F6", { "E6": "ok" }, {});
+kbd(document.getElementById("t4"), "C4", "C5", { "G4": "ok" }, {});
+kbd(document.getElementById("g1"), "C3", "C4", { "E3": "ok" }, {});
+</script>

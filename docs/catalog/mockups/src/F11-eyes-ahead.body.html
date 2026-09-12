@@ -1,0 +1,91 @@
+<!-- F11 · Eyes-ahead — Prima Volta mockups -->
+<header class="page"><h1>F11 · Eyes-ahead mechanics</h1>
+<p>Spec: <code>../F11-eyes-ahead.md</code> · Later phase; mocked now so renderer/generator carry the right metadata from day 1. Both mechanics, both stages. Notation engraved by embedded VexFlow.</p></header>
+
+<div class="grouphead">disappearing measures <small>lookahead 1 → 2 bars</small></div>
+<div class="row">
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · vanish · 1 bar · 2/3<span class="chip perf">Performance</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard"><div class="vfbox" id="va"></div><span class="scoreghost" style="left:36%;top:42%">gone</span></div>
+      </div>
+      <div class="rightcol">
+        <div class="metro"><i></i><i class="on"></i><i></i><span>♩ = 72 · bar 2</span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Lookahead 1.</b> Read Ahead's core mechanic, MIDI-graded (a market first): each bar vanishes at the first onset played in it, so the hands work from the buffer while the eyes read the next bar. Bar 1 is gone; hesitations at bar boundaries are the signature diagnostic — they mark lookahead failure precisely.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · vanish · 2 bars · 3/3<span class="chip perf">Performance</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard"><div class="vfbox" id="vb"></div><span class="scoreghost" style="left:33%;top:42%">gone</span><span class="scoreghost" style="left:56%;top:42%">gone</span></div>
+      </div>
+      <div class="rightcol">
+        <div class="metro"><i></i><i></i><i class="on"></i><span>♩ = 72 · bar 3</span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Lookahead 2.</b> The vanish now trails the eyes by two bars — the buffer requirement doubles as skill grows. This is the professional eye-hand span (~4 notes) being trained directly.</figcaption>
+</figure>
+
+</div>
+
+<div class="grouphead">memory flash <small>memorize → play from memory</small></div>
+<div class="row">
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · memory flash · 2/3<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt">
+        <div class="scorecard"><div class="vfbox" id="mf"></div></div>
+      </div>
+      <div class="rightcol">
+        <div class="ring"><div class="r"><span>3s</span></div><span>memorize — 2 bars</span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><b>Memorize stage</b> — the staff then blanks and both bars are played from memory. F8's mechanic scaled to musical context, the purest eye-hand-span measure (candidate minor input to the 07 Reading rating). Needs per-bar bounding boxes from <code>&lt;StaffView&gt;</code>.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">READING · memory flash · 3/3<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play it — both bars</div>
+        <div class="scorecard" style="margin-top:8px"><div class="vfbox" id="mr"></div><span class="scoreghost" style="left:40%;top:44%">from memory…</span></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback good">9 of 10 notes · contour intact <span class="lat">Good</span></div>
+      </div>
+    </div>
+    <div class="footerbar"><div class="btn">Show me</div><div class="btn primary">Next flash</div></div>
+  </div>
+  <figcaption><b>Recall stage.</b> Blank staff, play from the buffer. "Show me" reveals the score with the played take overlaid — the reveal is the teaching moment.</figcaption>
+</figure>
+
+</div>
+
+<script>
+vf(document.getElementById("va"), { key: "D", time: "3/4", height: 108, measures: [
+  {},
+  { notes: [{ k: ["a/4"], d: "q" }, { k: ["b/4"], d: "q" }, { k: ["c#/5"], d: "q" }] },
+  { notes: [{ k: ["d/5"], d: "q" }, { k: ["c#/5"], d: "q" }, { k: ["b/4"], d: "q" }] },
+] });
+vf(document.getElementById("vb"), { key: "D", time: "3/4", height: 108, measures: [
+  {}, {},
+  { notes: [{ k: ["f#/4"], d: "q" }, { k: ["g/4"], d: "q" }, { k: ["a/4"], d: "q" }] },
+] });
+vf(document.getElementById("mf"), { key: "D", time: "3/4", height: 108, measures: [
+  { notes: [{ k: ["d/4"], d: "q" }, { k: ["e/4"], d: "q" }, { k: ["f#/4"], d: "q" }] },
+  { notes: [{ k: ["g/4"], d: "q" }, { k: ["a/4"], d: "h" }] },
+] });
+vf(document.getElementById("mr"), { key: "D", time: "3/4", height: 108, measures: [{}] });
+</script>

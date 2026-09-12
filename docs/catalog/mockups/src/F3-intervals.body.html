@@ -1,0 +1,137 @@
+<!-- F3 · Intervals — Prima Volta mockups -->
+<header class="page"><h1>F3 · Intervals</h1>
+<p>Spec: <code>../F3-intervals.md</code> · The IntervalSelector, construction tiers T1–T4, and staff→midi. Beyond-the-octave is parked.</p></header>
+
+<div class="grouphead">T0 · the IntervalSelector <small>away-capable · where quality spelling is graded</small></div>
+<div class="row">
+<figure>
+  <div class="phone">
+    <div class="statusrow">INTERVALS · 1/5<span class="chip mode">Rehearsal</span><span class="devchip off"><i></i>away · no device</span></div>
+    <div class="prompt"><div class="ask">Name this interval</div></div>
+    <div class="scorecard"><svg viewBox="0 0 360 100">
+      <g class="stave">
+        <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+        <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+        <line x1="8" y1="66" x2="352" y2="66"/>
+        <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+      </g>
+      <text class="mus clef" x="14" y="60">𝄞</text>
+      <ellipse class="notehead" cx="150" cy="66" rx="6.4" ry="4.6"/>
+      <line class="stem" x1="156.2" y1="66" x2="156.2" y2="34"/>
+      <ellipse class="notehead" cx="210" cy="41" rx="6.4" ry="4.6"/>
+      <line class="stem" x1="203.8" y1="41" x2="203.8" y2="73"/>
+    </svg></div>
+    <div class="grouplab">Size</div>
+    <div class="chips seven">
+      <div class="choice">2</div><div class="choice">3</div><div class="choice">4</div><div class="choice">5</div>
+      <div class="choice ok">6</div><div class="choice">7</div><div class="choice">8</div>
+    </div>
+    <div class="grouplab">Quality</div>
+    <div class="chips five">
+      <div class="choice">dim</div><div class="choice ok">m</div><div class="choice">M</div><div class="choice">P</div><div class="choice">aug</div>
+    </div>
+    <div class="feedback good">E4 → C5 = m6 <span class="lat">2.1s · Good</span></div>
+  </div>
+  <figcaption><b>T0 — the IntervalSelector:</b> size + quality rows, the full option space (no sampled choices). Invalid combinations for a size (P3, m5) sit inert — a stable layout beats a shifting one (open Q1). The tritone accepts aug4 or dim5 unless the engraving disambiguates. This is where m6-vs-M6 spelling gets graded — MIDI can't see it. Choice frames keep the portrait phone.</figcaption>
+</figure>
+</div>
+
+<div class="grouphead">name→midi · construction tiers <small>beyond-the-octave parked</small></div>
+<div class="row">
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">INTERVALS · 2/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">M6 <svg class="dirarrow" viewBox="0 0 24 24"><path d="M12 20 V5 M5.5 11.5 12 5 18.5 11.5"/></svg></div><div class="sub">up from G3 · RH · melodic</div></div>
+      <div class="rightcol">
+        <div class="feedback good">G3 → E4 <span class="lat">1.3s · Good</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t1"></svg></div>
+  </div>
+  <figcaption><b>T1 — white-key anchors.</b> The anchor carries a dashed brass outline (given, not answer). Melodic order enforced; direction is part of the atom's identity — descending is its own skill.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">INTERVALS · 3/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">m7 <svg class="dirarrow" viewBox="0 0 24 24"><path d="M12 4 V19 M5.5 12.5 12 19 18.5 12.5"/></svg></div><div class="sub">down from D♭4 · LH · melodic</div></div>
+      <div class="rightcol">
+        <div class="feedback good">D♭4 → E♭3 <span class="lat">1.8s · Good</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t2"></svg></div>
+  </div>
+  <figcaption><b>T2 — all anchors.</b> Black-key starts and descending directions; the anchor highlight fades out over the tier.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">INTERVALS · harmonic · 4/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">m3</div><div class="sub">harmonic · above F4 · RH</div></div>
+      <div class="rightcol">
+        <div class="feedback good">F4 + A♭4 together <span class="lat">spread 32ms</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t3"></svg></div>
+  </div>
+  <figcaption><b>T3 — harmonic form.</b> Both notes inside the 80ms spread window — the two-finger grab, precursor to chord stacks.</figcaption>
+</figure>
+
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">INTERVALS · gate 2.0s · 5/5<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="big">P4 <svg class="dirarrow" viewBox="0 0 24 24"><path d="M12 20 V5 M5.5 11.5 12 5 18.5 11.5"/></svg></div><div class="sub">up from B♭3 · RH</div></div>
+      <div class="rightcol">
+        <div class="feedback good">B♭3 → E♭4 <span class="lat">1.1s · under gate</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="t4"></svg></div>
+  </div>
+  <figcaption><b>T4 — speeded.</b> Same items, fluency-gated clock (the gate named in the status strip); converges with F8's flash mechanics.</figcaption>
+</figure>
+
+</div>
+
+<div class="grouphead">staff→midi <small>read the pair, play the pair · exact octave</small></div>
+<div class="row">
+<figure class="wide">
+  <div class="phoneL">
+    <div class="statusrow">INTERVALS · from staff · 3/4<span class="chip mode">Rehearsal</span><span class="devchip"><i></i>FP-30X · USB</span></div>
+    <div class="landmain">
+      <div class="prompt"><div class="ask">Play these notes, in order</div>
+        <div class="scorecard" style="margin-top:8px"><svg viewBox="0 0 360 100">
+          <g class="stave">
+            <line x1="8" y1="26" x2="352" y2="26"/><line x1="8" y1="36" x2="352" y2="36"/>
+            <line x1="8" y1="46" x2="352" y2="46"/><line x1="8" y1="56" x2="352" y2="56"/>
+            <line x1="8" y1="66" x2="352" y2="66"/>
+            <line class="barline" x1="352" y1="26" x2="352" y2="66"/>
+          </g>
+          <text class="mus clef" x="14" y="60">𝄞</text>
+          <ellipse class="notehead" cx="150" cy="56" rx="6.4" ry="4.6"/>
+          <line class="stem" x1="156.2" y1="56" x2="156.2" y2="24"/>
+          <ellipse class="notehead" cx="210" cy="31" rx="6.4" ry="4.6"/>
+          <line class="stem" x1="203.8" y1="31" x2="203.8" y2="63"/>
+        </svg></div>
+      </div>
+      <div class="rightcol">
+        <div class="feedback good">G4 → E5 <span class="lat">1.6s · Good</span></div>
+      </div>
+    </div>
+    <div class="kbdcard"><svg id="sm1"></svg></div>
+  </div>
+  <figcaption><b>staff→midi.</b> No interval name anywhere — the skill is reading the gap as a shape and landing it. Exact octave; harmonic renderings (stacked heads) arrive with T3.</figcaption>
+</figure>
+</div>
+
+<script>
+kbd(document.getElementById("t1"), "C3", "E4", { "G3": "exp", "E4": "ok" }, {});
+kbd(document.getElementById("t2"), "C3", "F4", { "Db4": "exp", "Eb3": "ok" }, {});
+kbd(document.getElementById("t3"), "C4", "C5", { "F4": "ok", "Ab4": "ok" }, {});
+kbd(document.getElementById("t4"), "G3", "G4", { "Bb3": "exp", "Eb4": "ok" }, {});
+kbd(document.getElementById("sm1"), "C4", "F5", { "G4": "ok", "E5": "ok" }, {});
+</script>
