@@ -1,0 +1,41 @@
+{
+  "name": "prima-volta",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Piano fluency & sight-reading trainer — docs-before-code; Phase 0 skeleton",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "seed": "node seed/seeder.mjs",
+    "license-assert": "node tools/license-assert.mjs",
+    "db:generate": "drizzle-kit generate",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "drizzle-orm": "^0.44.2",
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "ts-fsrs": "^5.2.0"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.6.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "drizzle-kit": "^0.31.0",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0",
+    "wrangler": "^4.28.0"
+  }
+}

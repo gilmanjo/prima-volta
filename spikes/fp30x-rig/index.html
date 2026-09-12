@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FP-30X rig — Prima Volta spike</title>
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;background:#0e1218;color:#e8eaee;font:15px/1.5 system-ui,sans-serif;padding:28px}
+  main{max-width:760px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px} .sub{color:#9aa3b0;font-size:13px;margin:0 0 18px}
+  section{border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:16px;margin:0 0 16px}
+  h2{font-size:15px;margin:0 0 8px} p{color:#c6ccd6;font-size:13.5px;margin:6px 0}
+  button{background:#5b7fa6;color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer;margin-right:8px}
+  button.secondary{background:transparent;border:1px solid rgba(255,255,255,.25)}
+  button:disabled{opacity:.4;cursor:default}
+  .stat{font:600 15px ui-monospace,monospace;color:#82a6cb}
+  .log{font:12px ui-monospace,monospace;color:#9aa3b0;white-space:pre-wrap;max-height:150px;overflow:auto;background:rgba(255,255,255,.04);border-radius:6px;padding:8px;margin-top:8px}
+  #dev{color:#7fd49a}
+</style>
+</head>
+<body><main>
+<h1>FP-30X measurement rig</h1>
+<p class="sub">03-GRADING's parked constants, measured for real (spike — local-only, ground rule 2). Run once per <b>keyboard × transport</b> (USB and Bluetooth are separate device profiles). Export the JSON when done.</p>
+
+<section>
+  <h2>Device</h2>
+  <p id="dev">waiting for Web MIDI… (Chrome + a connected keyboard; this page must be on localhost)</p>
+</section>
+
+<section>
+  <h2>1 · Latency &amp; jitter — the 8-click ritual (03 §3)</h2>
+  <p>Press <b>any key exactly on each click</b>. 8 clicks at ♩=100. The median offset becomes the profile's latency correction; the spread is its jitter.</p>
+  <button id="calStart">Start the ritual</button><span id="calStat" class="stat"></span>
+  <div class="log" id="calLog"></div>
+</section>
+
+<section>
+  <h2>2 · Velocity floor</h2>
+  <p>First <b>brush</b> keys as lightly as you can (accidental-touch territory, ~10 touches), then click "now play normally" and play ~10 <b>intended</b> soft notes. The gap between the two clusters is the floor.</p>
+  <button id="velBrush">Record brushes</button>
+  <button id="velPlay" disabled>Now play normally</button>
+  <button id="velDone" class="secondary" disabled>Done</button>
+  <span id="velStat" class="stat"></span>
+  <div class="log" id="velLog"></div>
+</section>
+
+<section>
+  <h2>3 · Hesitation baseline</h2>
+  <p>Play something easy and even, self-paced (a C-major scale up and down a few times). Reports the IOI distribution and how many onsets would flag at 1.5× / 2× / 2.5× the local median — grounding 03's "IOI &gt; 2× local median" proposal.</p>
+  <button id="hesStart">Start</button>
+  <button id="hesStop" class="secondary" disabled>Stop</button>
+  <span id="hesStat" class="stat"></span>
+  <div class="log" id="hesLog"></div>
+</section>
+
+<section>
+  <h2>Export</h2>
+  <p>Downloads every run on this page as JSON (device info + raw timestamps included — 03 §1.6 spirit: keep the raw).</p>
+  <button id="export" class="secondary">Download rig-results.json</button>
+</section>
+
+<script>
+"use strict";
+const results = { userAgent: navigator.userAgent, when: new Date().toISOString(), device: null, calibration: [], velocity: [], hesitation: [] };
+const $ = id => document.getElementById(id);
+let midi = null, onNote = null;
+
+navigator.requestMIDIAccess?.().then(m => {
+  midi = m;
+  const wire = () => {
+    const ins = [...m.inputs.values()];
+    $("dev").textContent = ins.length ? ins.map(i => `${i.manufacturer} ${i.name}`).join(" · ") : "no MIDI inputs — connect the keyboard";
+    results.device = ins.map(i => ({ name: i.name, manufacturer: i.manufacturer, id: i.id }));
+    for (const i of ins) i.onmidimessage = e => {
+      const [st, note, vel] = e.data;
+      if ((st & 0xf0) === 0x90 && vel > 0 && onNote) onNote({ t: e.timeStamp, note, vel });
+    };
+  };
+  wire(); m.onstatechange = wire;
+}).catch(() => $("dev").textContent = "Web MIDI unavailable — use Chrome on localhost");
+
+// audio click
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+function click(atAudioTime) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.frequency.value = 1200; o.connect(g); g.connect(AC.destination);
+  g.gain.setValueAtTime(0.6, atAudioTime); g.gain.exponentialRampToValueAtTime(0.001, atAudioTime + 0.05);
+  o.start(atAudioTime); o.stop(atAudioTime + 0.06);
+}
+const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[s.length >> 1] : NaN; };
+const spread = a => { const s = [...a].sort((x, y) => x - y); return s.length > 3 ? s[Math.floor(s.length * .84)] - s[Math.floor(s.length * .16)] : NaN; };
+
+// 1 · calibration
+$("calStart").onclick = async () => {
+  await AC.resume();
+  $("calStart").disabled = true; $("calStat").textContent = "listen…";
+  const N = 8, iv = 0.6, t0 = AC.currentTime + 1;
+  const clickPerf = [];
+  const perfPerAudio = performance.now() - AC.currentTime * 1000; // map audio clock → performance clock
+  for (let k = 0; k < N; k++) { click(t0 + k * iv); clickPerf.push((t0 + k * iv) * 1000 + perfPerAudio); }
+  const hits = [];
+  onNote = n => hits.push(n);
+  setTimeout(() => {
+    onNote = null;
+    const offsets = clickPerf.map(ct => {
+      let best = null; for (const h of hits) { const d = h.t - ct; if (d > -250 && d < 350 && (best === null || Math.abs(d) < Math.abs(best))) best = d; }
+      return best;
+    }).filter(o => o !== null);
+    const run = { offsets: offsets.map(o => +o.toFixed(1)), median: +median(offsets).toFixed(1), spread: +spread(offsets).toFixed(1), hits: hits.length };
+    results.calibration.push(run);
+    $("calStat").textContent = ` median ${run.median} ms · spread ${run.spread} ms (${offsets.length}/${N} matched)`;
+    $("calLog").textContent = JSON.stringify(results.calibration, null, 1);
+    $("calStart").disabled = false;
+  }, (1 + N * iv + 0.6) * 1000);
+};
+
+// 2 · velocity floor
+let velPhase = null;
+const velRun = { brushes: [], intended: [] };
+$("velBrush").onclick = async () => { await AC.resume(); velPhase = "brushes"; $("velPlay").disabled = false; $("velDone").disabled = false;
+  onNote = n => { velRun[velPhase].push(n.vel); $("velStat").textContent = ` brushes ${velRun.brushes.length} · intended ${velRun.intended.length}`; }; };
+$("velPlay").onclick = () => { velPhase = "intended"; };
+$("velDone").onclick = () => {
+  onNote = null; $("velPlay").disabled = true; $("velDone").disabled = true;
+  const maxBrush = Math.max(0, ...velRun.brushes), minIntent = Math.min(127, ...velRun.intended);
+  const run = { ...velRun, maxBrush, minIntended: minIntent, suggestedFloor: Math.round((maxBrush + minIntent) / 2) };
+  results.velocity.push(run);
+  $("velStat").textContent = ` max brush ${maxBrush} · min intended ${minIntent} → suggested floor ${run.suggestedFloor}`;
+  $("velLog").textContent = JSON.stringify(results.velocity, null, 1);
+  velRun.brushes = []; velRun.intended = [];
+};
+
+// 3 · hesitation baseline
+let hesOnsets = [];
+$("hesStart").onclick = async () => { await AC.resume(); hesOnsets = []; $("hesStop").disabled = false; $("hesStart").disabled = true;
+  onNote = n => { hesOnsets.push(n.t); $("hesStat").textContent = ` ${hesOnsets.length} onsets`; }; };
+$("hesStop").onclick = () => {
+  onNote = null; $("hesStop").disabled = true; $("hesStart").disabled = false;
+  const iois = hesOnsets.slice(1).map((t, i) => t - hesOnsets[i]).filter(d => d < 3000);
+  const flagsAt = k => { let n = 0; for (let i = 0; i < iois.length; i++) { const local = median(iois.slice(Math.max(0, i - 4), i + 5)); if (iois[i] > k * local) n++; } return n; };
+  const run = { onsets: hesOnsets.length, medianIOI: +median(iois).toFixed(0), flagged: { "1.5x": flagsAt(1.5), "2x": flagsAt(2), "2.5x": flagsAt(2.5) }, iois: iois.map(d => +d.toFixed(0)) };
+  results.hesitation.push(run);
+  $("hesStat").textContent = ` median IOI ${run.medianIOI} ms · flags 1.5×:${run.flagged["1.5x"]} 2×:${run.flagged["2x"]} 2.5×:${run.flagged["2.5x"]}`;
+  $("hesLog").textContent = JSON.stringify(results.hesitation.map(({ iois, ...r }) => r), null, 1);
+};
+
+// export
+$("export").onclick = () => {
+  const blob = new Blob([JSON.stringify(results, null, 1)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "rig-results.json"; a.click();
+};
+</script>
+</main></body></html>

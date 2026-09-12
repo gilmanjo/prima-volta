@@ -1,0 +1,20 @@
+// Cloudflare Workers config (10 §2/§6). Deploy: `npm run deploy` (after `wrangler login`).
+// JORDAN: create the database once with `npx wrangler d1 create prima-volta`
+// and paste its id over REPLACE_WITH_D1_ID below.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prima-volta",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "prima-volta",
+      "database_id": "REPLACE_WITH_D1_ID",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "observability": { "enabled": true }
+}

@@ -1,0 +1,52 @@
+{
+  "rows": [
+    {
+      "family": "F1 Keys",
+      "full": 104,
+      "default": 24
+    },
+    {
+      "family": "F2 Reading",
+      "full": 108,
+      "default": 36
+    },
+    {
+      "family": "F3 Intervals",
+      "full": 420,
+      "default": 204
+    },
+    {
+      "family": "F4 Chords",
+      "full": 6192,
+      "default": 5604
+    },
+    {
+      "family": "F5 Scales",
+      "full": 324,
+      "default": 72
+    },
+    {
+      "family": "F6 Arpeggios",
+      "full": 192,
+      "default": 72
+    },
+    {
+      "family": "F7 Rhythm",
+      "full": 166,
+      "default": 36
+    },
+    {
+      "family": "F8 Flash",
+      "full": 81,
+      "default": 4
+    },
+    {
+      "family": "F9 Topography",
+      "full": 36,
+      "default": 16
+    }
+  ],
+  "totalFull": 7623,
+  "totalDefault": 6068,
+  "budget": 20000
+}

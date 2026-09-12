@@ -187,40 +187,50 @@ const CONFUSABLES = {
   widening: "only from observed confusion tags, never speculation (04 §6)",
 };
 
-// ---------- enumerate, count, assert, emit ----------
+// ---------- enumerate, count, assert ----------
 const FAMILIES = [["F1 Keys", f1], ["F2 Reading", f2], ["F3 Intervals", f3], ["F4 Chords", f4],
   ["F5 Scales", f5], ["F6 Arpeggios", f6], ["F7 Rhythm", f7], ["F8 Flash", f8], ["F9 Topography", f9]];
 
-const atoms = [];
-const rows = [];
-for (const [label, gen] of FAMILIES) {
-  let full = 0, dflt = 0;
-  for (const [atom, inDefault] of gen()) {
-    full++; if (inDefault) dflt++;
-    atoms.push({ id: atomId({ ...atom, familyVersion: FAMILY_VERSIONS[atom.family] }), ...atom, inDefault });
+export function buildCatalog() {
+  const atoms = [];
+  const rows = [];
+  for (const [label, gen] of FAMILIES) {
+    let full = 0, dflt = 0;
+    for (const [atom, inDefault] of gen()) {
+      full++; if (inDefault) dflt++;
+      atoms.push({ id: atomId({ ...atom, familyVersion: FAMILY_VERSIONS[atom.family] }), ...atom, inDefault });
+    }
+    rows.push({ family: label, full, default: dflt });
   }
-  rows.push({ family: label, full, default: dflt });
-}
-const totalFull = rows.reduce((a, r) => a + r.full, 0);
-const totalDefault = rows.reduce((a, r) => a + r.default, 0);
-
-const ids = new Set(atoms.map(a => a.id));
-if (ids.size !== atoms.length) throw new Error(`ID COLLISION: ${atoms.length - ids.size} duplicate atom ids`);
-if (totalFull >= BUDGET) throw new Error(`BUDGET EXCEEDED: full space ${totalFull} >= ${BUDGET} (02 §4)`);
-
-if (!process.argv.includes("--quiet")) {
-  console.table([...rows, { family: "TOTAL", full: totalFull, default: totalDefault }]);
-  console.log(`budget: ${totalFull} < ${BUDGET} ✓   unique ids ✓`);
+  const totalFull = rows.reduce((a, r) => a + r.full, 0);
+  const totalDefault = rows.reduce((a, r) => a + r.default, 0);
+  const ids = new Set(atoms.map(a => a.id));
+  if (ids.size !== atoms.length) throw new Error(`ID COLLISION: ${atoms.length - ids.size} duplicate atom ids`);
+  if (totalFull >= BUDGET) throw new Error(`BUDGET EXCEEDED: full space ${totalFull} >= ${BUDGET} (02 §4)`);
+  return { rows, totalFull, totalDefault, atoms };
 }
 
-writeFileSync(OUT, JSON.stringify({
-  generated: "seed/seeder.mjs",
-  familyVersions: FAMILY_VERSIONS,
-  counts: { rows, totalFull, totalDefault, budget: BUDGET },
-  admission: ADMISSION,
-  subsumption: SUBSUMPTION,
-  confusables: CONFUSABLES,
-  defaultScope: SCOPE,
-  atoms,
-}, null, 1));
-if (!process.argv.includes("--quiet")) console.log(`wrote ${OUT} (${atoms.length} atoms)`);
+export { FAMILY_VERSIONS, ADMISSION, SUBSUMPTION, CONFUSABLES, SCOPE, BUDGET };
+
+// ---------- CLI: emit catalog.json + counts.json ----------
+import { pathToFileURL } from "node:url";
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { rows, totalFull, totalDefault, atoms } = buildCatalog();
+  if (!process.argv.includes("--quiet")) {
+    console.table([...rows, { family: "TOTAL", full: totalFull, default: totalDefault }]);
+    console.log(`budget: ${totalFull} < ${BUDGET} ✓   unique ids ✓`);
+  }
+  writeFileSync(OUT, JSON.stringify({
+    generated: "seed/seeder.mjs",
+    familyVersions: FAMILY_VERSIONS,
+    counts: { rows, totalFull, totalDefault, budget: BUDGET },
+    admission: ADMISSION,
+    subsumption: SUBSUMPTION,
+    confusables: CONFUSABLES,
+    defaultScope: SCOPE,
+    atoms,
+  }, null, 1));
+  writeFileSync(join(dirname(OUT), "counts.json"),
+    JSON.stringify({ rows, totalFull, totalDefault, budget: BUDGET }, null, 2));
+  if (!process.argv.includes("--quiet")) console.log(`wrote ${OUT} (${atoms.length} atoms) + counts.json`);
+}
