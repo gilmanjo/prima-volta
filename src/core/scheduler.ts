@@ -45,6 +45,7 @@ export interface ReviewRow {
   parentAttemptId: string | null;
   paramGroup: "A" | "B";
   reviewedAt: number;
+  instanceSeed?: string | null; // sampled-target atoms log the seed on the review (02 §1)
 }
 
 export function windowFor(card: DrillCard): number {

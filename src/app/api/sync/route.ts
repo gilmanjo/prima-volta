@@ -51,7 +51,7 @@ export async function POST(req: Request): Promise<Response> {
   for (const a of body.attempts ?? []) {
     await db.insert(attempts).values({
       id: String(a.id), userId: USER, boutId: String(a.boutId), kind: "drill",
-      atomId: (a.atomId as string) ?? null, requestJson: null, seed: null, scoreJson: null,
+      atomId: (a.atomId as string) ?? null, requestJson: null, seed: (a.seed as string) ?? null, scoreJson: null,
       mode: "rehearsal", profileId: (a.profileId as string) ?? null,
       rawMidi: JSON.stringify(a.rawMidi ?? []),
       rawChoiceJson: a.rawChoiceJson === undefined ? null : JSON.stringify(a.rawChoiceJson),
@@ -64,7 +64,7 @@ export async function POST(req: Request): Promise<Response> {
       id: String(r.id), userId: USER, atomId: String(r.atomId), attemptId: String(r.attemptId),
       rating: Number(r.rating), latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
       tier: Number(r.tier ?? 0), derived: Boolean(r.derived),
-      parentAttemptId: (r.parentAttemptId as string) ?? null, instanceSeed: null,
+      parentAttemptId: (r.parentAttemptId as string) ?? null, instanceSeed: (r.instanceSeed as string) ?? null,
       errorSummaryJson: null, paramGroup: "A", reviewedAt: Number(r.reviewedAt ?? 0),
     }).onConflictDoNothing();
   }

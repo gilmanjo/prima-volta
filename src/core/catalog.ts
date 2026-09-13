@@ -40,8 +40,17 @@ export interface KeysAtom extends CatalogAtom {
   dir: "sigToKey" | "keyToSig";
 }
 
+export interface ReadingAtom extends CatalogAtom {
+  family: "reading";
+  clef: "treble" | "bass" | "grand";
+  band: "staff12" | "ledger3";
+  keyContext: "open" | "ks14" | "ksAll";
+  accidental: "none" | "single" | "double";
+  answer: "midi" | "selector";
+}
+
 /** The playable-atom union the filler and player serve. */
-export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom | KeysAtom;
+export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom | KeysAtom | ReadingAtom;
 
 const atoms = (catalogJson as { atoms: CatalogAtom[] }).atoms;
 const byId = new Map(atoms.map(a => [a.id, a]));
@@ -104,13 +113,26 @@ export function keysAdmissionKey(a: KeysAtom): number[] {
   return [waveOf(majorTonicPc(a.sig)), a.dir === "keyToSig" ? 1 : 0, a.clef === "bass" ? 1 : 0, a.mode === "minor" ? 1 : 0];
 }
 
-const FAMILY_ORDER: Record<string, number> = { keys: 0, chord: 1, scale: 2, arp: 3 };
+/** Admission key for F2 atoms — the tier ladder over the crossed dimensions (F2 §Tier ladder):
+ *  T0 staff12/open/none → T1 single accidentals → T2 key signatures (ks14, ksAll widening
+ *  within) → T3 deep ledger → T4 doubles. Crossed atoms admit at their LATER dimension. */
+export function readingAdmissionKey(a: ReadingAtom): number[] {
+  const band = a.band === "ledger3" ? 3 : 0;
+  const acc = a.accidental === "double" ? 4 : a.accidental === "single" ? 1 : 0;
+  const ctx = a.keyContext === "ksAll" ? 2.5 : a.keyContext === "ks14" ? 2 : 0;
+  const stage = Math.max(band, acc, ctx);
+  const clef = a.clef === "treble" ? 0 : a.clef === "bass" ? 1 : 2;
+  return [stage, ctx, acc, band, clef, a.answer === "selector" ? 1 : 0];
+}
+
+const FAMILY_ORDER: Record<string, number> = { keys: 0, chord: 1, scale: 2, arp: 3, reading: 4, interval: 5 };
 
 function admissionKey(a: DrillAtom): number[] {
   const fam = FAMILY_ORDER[a.family] ?? 9;
   if (a.family === "keys") return [fam, ...keysAdmissionKey(a)];
   if (a.family === "scale") return [fam, ...scaleAdmissionKey(a)];
   if (a.family === "arp") return [fam, ...arpAdmissionKey(a)];
+  if (a.family === "reading") return [fam, ...readingAdmissionKey(a)];
   return [fam, ...chordAdmissionKey(a)];
 }
 
@@ -128,6 +150,7 @@ export function identityOf(a: DrillAtom): { root: unknown; quality: unknown } {
   if (a.family === "keys") return { root: majorTonicPc(a.sig), quality: a.dir };
   if (a.family === "scale") return { root: a.key, quality: a.type };
   if (a.family === "arp") return { root: a.root, quality: a.basis };
+  if (a.family === "reading") return { root: a.band, quality: `${a.keyContext}·${a.accidental}` };
   return { root: a.root, quality: a.quality };
 }
 
@@ -205,6 +228,7 @@ export function atomTitle(a: DrillAtom): string {
   if (a.family === "keys") return keyNameOf(a.sig, a.mode);
   if (a.family === "scale") return `${PC_NAMES[a.key]} ${SCALE_LABEL[a.type]}`;
   if (a.family === "arp") return `${PC_NAMES[a.root]} ${ARP_LABEL[a.basis]} arpeggio`;
+  if (a.family === "reading") return "Read the note"; // the engraving IS the prompt
   return chordSymbol(a);
 }
 

@@ -8,8 +8,12 @@ import Link from "next/link";
 import { Keybed, type KeyState } from "../../components/Keybed";
 import {
   atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, keyNameOf, relativeOf, sigSpelling, subsumedBy, PC_NAMES,
-  type ArpAtom, type ChordAtom, type DrillAtom, type KeysAtom, type ScaleAtom,
+  type ArpAtom, type ChordAtom, type DrillAtom, type KeysAtom, type ReadingAtom, type ScaleAtom,
 } from "../../core/catalog";
+import { sampleReading, spellSounding, LETTERS, type ReadingInstance } from "../../core/reading";
+import { gradeSingleNote } from "../../core/grader/note";
+import { StaffView } from "../../components/StaffView";
+import { NoteSelector } from "../../components/NoteSelector";
 import { Sig } from "../../components/Sig";
 import { KeyWheel, SigGrid, type PickState } from "../../components/KeysWidgets";
 import { gradeChoice, gradeSpellTaps } from "../../core/grader/choice";
@@ -20,7 +24,7 @@ import { buildRun, runTempo, selfPacedRunResult, type Run } from "../../core/run
 import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from "../../core/scheduler";
 import { ulid } from "../../core/ulid";
 import type { GradeResult, NoteEvent, Pc } from "../../core/types";
-import { CHORD_SPREAD_MS, KNOWLEDGE_WINDOW_MS } from "../../core/constants";
+import { CHORD_SPREAD_MS, KNOWLEDGE_WINDOW_MS, READ_GATE_WINDOW_MS, READ_LEARN_WINDOW_MS } from "../../core/constants";
 import { STARTER_TEMPLATE, type PracticeTemplate, type TemplateBlock } from "../../core/template";
 import { defaultProfile, initMidi, onNote, onNoteOff } from "../../services/midi";
 import { ensureAudio, ui } from "../../services/uiAudio";
@@ -30,8 +34,8 @@ import { appendAttempt, appendReview, attachBoutProfile, loadCards, loadProfile,
 type Phase = "init" | "teach" | "prompt" | "reconcile" | "good" | "next" | "interstitial" | "done" | "polishing" | "unavailable";
 const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never bleeds in (U2)
 
-type Family = "chord" | "scale" | "arp" | "keys" | "free";
-const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures", free: "Free roam" };
+type Family = "chord" | "scale" | "arp" | "keys" | "reading" | "free";
+const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures", reading: "Note reading", free: "Free roam" };
 
 const CHORD_POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
   .filter(a => !a.stream && (a.answer === "midi" ? a.cue === "name" && a.form === "blocked" : a.answer === "spell"))
@@ -40,13 +44,25 @@ const CHORD_POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
 function poolFor(f: Family): DrillAtom[] {
   if (f === "keys")
     return (catalog.defaults("keys") as KeysAtom[]).sort(compareAdmission);
-  if (f === "scale") // keysig cue is engraved — staff territory, Phase 2
+  if (f === "scale") // keysig cue is engraved — staff territory, still ahead
     return (catalog.defaults("scale") as ScaleAtom[]).filter(a => a.cue === "name").sort(compareAdmission);
   if (f === "arp") // alternating is the T6 capstone — its handoff grading comes later
     return (catalog.defaults("arp") as ArpAtom[]).filter(a => a.hand !== "alternating").sort(compareAdmission);
+  if (f === "reading")
+    return (catalog.defaults("reading") as ReadingAtom[]).sort(compareAdmission);
   if (f === "free") // U1's ruled free roam: the weakest-first everything-in-scope mix
-    return [...poolFor("keys"), ...CHORD_POOL, ...poolFor("scale"), ...poolFor("arp")].sort(compareAdmission);
+    return [...poolFor("keys"), ...CHORD_POOL, ...poolFor("scale"), ...poolFor("arp"), ...poolFor("reading")].sort(compareAdmission);
   return CHORD_POOL;
+}
+
+/** Knowledge-only mode (08 §7 — a filter, not a mode): with no MIDI device the filler
+ *  offers only choice-answerable atoms; identical scheduling, identical evidence. */
+function deviceFiltered(pool: DrillAtom[], hasDevice: boolean): DrillAtom[] {
+  if (hasDevice) return pool;
+  return pool.filter(a =>
+    a.family === "keys" ||
+    (a.family === "chord" && a.answer === "spell") ||
+    (a.family === "reading" && a.answer === "selector"));
 }
 
 /** A template block's serving pool (08 §5): its areas' pools, weakest-first via the filler. */
@@ -60,6 +76,7 @@ const isRunAtom = (a: DrillAtom): a is ScaleAtom | ArpAtom => a.family === "scal
 const isKeysAtom = (a: DrillAtom): a is KeysAtom => a.family === "keys";
 const isSpellAtom = (a: DrillAtom): a is ChordAtom & { answer: "spell" } =>
   a.family === "chord" && a.answer === "spell";
+const isReadingAtom = (a: DrillAtom): a is ReadingAtom => a.family === "reading";
 
 /** Confirmation copy (F1 §Variants): sig→key reveals the relative pairing (and the ±6
  *  enharmonic); key→sig spells the accidentals in order. */
@@ -81,6 +98,8 @@ export default function Practice() {
   const [feedback, setFeedback] = useState<string>("");
   const [labels, setLabels] = useState<Record<number, string> | null>(null);
   const [picks, setPicks] = useState<Record<number, PickState>>({});
+  const [inst, setInst] = useState<ReadingInstance | null>(null);
+  const [doubles, setDoubles] = useState(false);
 
   const S = useRef<{
     filler: FillerState; pool: DrillAtom[]; served: number; profileId: string | null;
@@ -92,6 +111,7 @@ export default function Practice() {
     spellTaps: { midi: number; atMs: number }[];
     run: Run | null; runNoteMs: number; runPos: number; runSlotHit: Set<number>; runOnsets: number[];
     teachSlot: number; teachHit: Set<number>; baseKeys: Record<number, KeyState>;
+    readingInst: ReadingInstance | null; readingSeed: number; hasDevice: boolean;
   }>({
     filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, pool: CHORD_POOL, served: 0,
     profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
@@ -99,6 +119,7 @@ export default function Practice() {
     card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(),
     sinceSync: 0, finalized: false, retryTimer: null, reconcileArmedAt: 0, reconcileBuf: [], spellTaps: [],
     run: null, runNoteMs: 1000, runPos: 0, runSlotHit: new Set(), runOnsets: [], teachSlot: 0, teachHit: new Set(), baseKeys: {},
+    readingInst: null, readingSeed: 0, hasDevice: false,
   });
 
   const phaseRef = useRef<Phase>("init");
@@ -108,7 +129,7 @@ export default function Practice() {
 
   const expectedKeyStates = useCallback((a: DrillAtom, state: KeyState): Record<number, KeyState> => {
     const out: Record<number, KeyState> = {};
-    if (isKeysAtom(a)) return out; // choice atoms answer on widgets, not the keybed
+    if (isKeysAtom(a) || isReadingAtom(a)) return out; // widgets or single-key lighting handle these
     if (isRunAtom(a)) {
       for (const m of buildRun(a).pathMidis) out[m] = state;
       return out;
@@ -139,7 +160,8 @@ export default function Practice() {
     setKeys({});
     st.baseKeys = {}; // the board always clears between items (log #74's stale-green report)
     st.finalized = false;
-    const res = fillerNext({ pool: st.pool }, st.filler, { servedCount: st.served, nowMs: Date.now() });
+    // knowledge-only mode (08 §7): no device → only choice-answerable atoms are offered
+    const res = fillerNext({ pool: deviceFiltered(st.pool, st.hasDevice) }, st.filler, { servedCount: st.served, nowMs: Date.now() });
     if (res.kind === "polishing" || res.kind === "unavailable") {
       setPhase(res.kind);
       st.retryTimer = window.setTimeout(serve, 4000); // never a dead screen — quietly check again
@@ -155,6 +177,7 @@ export default function Practice() {
     setFeedback("");
     setLabels(null);
     setPicks({});
+    setInst(null);
     if (isKeysAtom(res.atom)) {
       st.run = null;
       if (res.kind === "teach") {
@@ -186,6 +209,29 @@ export default function Practice() {
       return;
     }
     st.run = null;
+    if (isReadingAtom(res.atom)) {
+      // engine-A with a SAMPLED target (02 §1): fresh seeded instance, seed logged
+      st.readingSeed = Math.floor(Math.random() * 2 ** 31);
+      st.readingInst = sampleReading(res.atom, st.readingSeed);
+      setInst(st.readingInst);
+      // the NoteSelector's accidental row grows once doubles have admitted (F2 §Variants)
+      setDoubles(res.atom.accidental === "double" || [...st.filler.cards.keys()].some(id => {
+        const at = catalog.byId(id) as ReadingAtom | undefined;
+        return at?.family === "reading" && at.accidental === "double";
+      }));
+      if (res.kind === "teach") {
+        if (res.atom.answer === "midi") {
+          const base = { [st.readingInst.midi]: "exp" as KeyState };
+          st.baseKeys = base;
+          setKeys(base);
+        }
+        setFeedback(st.readingInst.spelled);
+        setPhase("teach");
+      } else {
+        setPhase("prompt");
+      }
+      return;
+    }
     if (isSpellAtom(res.atom)) {
       st.spellTaps = [];
       if (res.kind === "teach") {
@@ -254,7 +300,7 @@ export default function Practice() {
     }, delayMs);
   }, [serve]);
 
-  const logAttempt = useCallback((a: DrillAtom, attemptId: string, nowMs: number, gradeJson: Record<string, unknown>, rawChoiceJson?: unknown) => {
+  const logAttempt = useCallback((a: DrillAtom, attemptId: string, nowMs: number, gradeJson: Record<string, unknown>, rawChoiceJson?: unknown, seed?: string) => {
     const st = S.current;
     const raw = rawChoiceJson === undefined ? st.collected.slice() : [];
     void (async () => {
@@ -264,12 +310,85 @@ export default function Practice() {
         id: attemptId, kind: "drill", atomId: a.id, mode: "rehearsal", profileId: st.profileId,
         rawMidi: raw,
         ...(rawChoiceJson !== undefined ? { rawChoiceJson } : {}),
+        ...(seed !== undefined ? { seed } : {}),
         graderVersion: "v1", tagsVersion: "v1", gradeJson,
         startedAt: Math.round(nowMs - (performance.now() - st.promptAt)), boutId,
       });
       if (++st.sinceSync >= 8) { st.sinceSync = 0; void pushOutbox(); }
     })();
   }, []);
+
+  /** F2 staff→midi: the first key answers — octave-strict, sounding pitch (F𝄪4 accepts G4's key). */
+  const finalizeReading = useCallback((a: ReadingAtom, note: NoteEvent) => {
+    const st = S.current;
+    const inst = st.readingInst!;
+    const windowMs = st.card!.tier === 1 ? READ_GATE_WINDOW_MS : READ_LEARN_WINDOW_MS;
+    const res = gradeSingleNote({ midi: inst.midi, spelled: inst.spelled, windowMs, promptAtMs: st.promptAt }, note);
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    const { card: after, row } = applyRep(st.card!, res, attemptId, { servedCount: st.served, nowMs });
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs, { rating: res.rating, latencyMs: res.latencyMs, errors: res.errorEvents.length }, undefined, String(st.readingSeed));
+    void appendReview({ id: ulid(), ...row, instanceSeed: String(st.readingSeed) });
+    if (res.rating === 1) {
+      ui.err();
+      const base: Record<number, KeyState> = { [inst.midi]: "exp", [note.midi]: "err" };
+      st.baseKeys = base;
+      setKeys(base);
+      setFeedback(`Expected ${inst.spelled}`);
+      setPhase("reconcile");
+      return;
+    }
+    if (res.rating === 3) ui.good(); else ui.hard();
+    setFeedback(`${inst.spelled} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setPhase("good");
+    advance(850);
+  }, [advance, logAttempt]);
+
+  /** F2 staff→NoteSelector: symbolic naming — the spelling itself is graded (F𝄪 ≠ G). */
+  const handleReadingPick = useCallback((sym: { letter: number; acc: number; octave: number }) => {
+    const a = atomRef.current;
+    const st = S.current;
+    const ph = phaseRef.current;
+    if (!a || !isReadingAtom(a) || a.answer !== "selector") return;
+    const inst = st.readingInst!;
+    const playedSym = spellSounding(sym.letter, sym.octave, sym.acc, 0);
+    if (ph === "teach" || ph === "reconcile") {
+      if (playedSym !== inst.spelled) return;
+      if (ph === "teach") {
+        const taught = afterTeach(st.card!);
+        st.filler.cards.set(a.id, taught);
+        void saveCard(taught);
+        advance(250);
+      } else { ui.good(); advance(250); }
+      return;
+    }
+    if (ph !== "prompt" || st.finalized) return;
+    st.finalized = true;
+    const commitAt = performance.now();
+    const res = gradeChoice({ expectedSym: inst.spelled, windowMs: KNOWLEDGE_WINDOW_MS, promptAtMs: st.promptAt }, playedSym, commitAt);
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    // the selector variant is knowledge — tierless, no gate (02 §1)
+    const { card: after, row } = applyRep(st.card!, res, attemptId, { servedCount: st.served, nowMs }, false, null, false);
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs, { rating: res.rating, latencyMs: res.latencyMs, errors: res.errorEvents.length },
+      { expectedSym: inst.spelled, tapped: [{ sym: playedSym, atMs: Math.round(commitAt - st.promptAt) }] }, String(st.readingSeed));
+    void appendReview({ id: ulid(), ...row, instanceSeed: String(st.readingSeed) });
+    if (res.rating === 1) {
+      ui.err();
+      setFeedback(`Expected ${inst.spelled}`);
+      setPhase("reconcile");
+      return;
+    }
+    if (res.rating === 3) ui.good(); else ui.hard();
+    setFeedback(`${inst.spelled} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setPhase("good");
+    advance(1000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advance, logAttempt]);
 
   const finalize = useCallback(async (a: ChordAtom) => {
     const st = S.current;
@@ -475,6 +594,30 @@ export default function Practice() {
     if (!a) return;
     if (isKeysAtom(a)) return; // choice atoms answer on widgets — the piano is silent here
     if (isSpellAtom(a)) { spellInput(n.midi); return; } // a played key spells too — same recall
+    if (isReadingAtom(a)) {
+      if (a.answer !== "midi") return; // the selector variant answers on the widget
+      const inst = st.readingInst!;
+      if (ph === "teach") {
+        if (n.midi !== inst.midi) return; // ungraded — wrongs ignored
+        setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        const taught = afterTeach(st.card!);
+        st.filler.cards.set(a.id, taught);
+        void saveCard(taught);
+        advance(300);
+        return;
+      }
+      if (ph === "reconcile") {
+        if (n.midi === inst.midi) { setKeys(k => ({ ...k, [n.midi]: "ok" })); ui.good(); advance(250); }
+        else setKeys(k => ({ ...k, [n.midi]: "err" }));
+        return;
+      }
+      if (ph !== "prompt" || st.finalized) return;
+      st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
+      st.finalized = true; // the first key answers a single-note read
+      setKeys(k => ({ ...k, [n.midi]: n.midi === inst.midi ? "ok" : "err" }));
+      finalizeReading(a, { midi: n.midi, onMs: n.onMs, vel: n.vel });
+      return;
+    }
 
     if (isRunAtom(a)) {
       if (ph === "teach") {
@@ -628,7 +771,7 @@ export default function Practice() {
     document.addEventListener("pointerdown", arm);
     const params = new URLSearchParams(window.location.search);
     const f = params.get("family");
-    const fam: Family = f === "scale" || f === "arp" || f === "keys" || f === "free" ? f : "chord";
+    const fam: Family = f === "scale" || f === "arp" || f === "keys" || f === "reading" || f === "free" ? f : "chord";
     S.current.pool = poolFor(fam);
     setFamily(fam);
     if (params.get("template") === "starter") S.current.template = STARTER_TEMPLATE;
@@ -639,7 +782,10 @@ export default function Practice() {
         // new-device boot (10 §5): pull the log stream once and refold the cards from it
         const pulled = await pullReplica(rows => refoldCards(rows, id => {
           const a = catalog.byId(id) as DrillAtom | undefined;
-          return a ? !(a.family === "keys" || (a.family === "chord" && a.answer !== "midi")) : true;
+          if (!a) return true;
+          // knowledge atoms are tierless — no gate (02 §1): keys, chord knowledge, reading selector
+          return !(a.family === "keys" || (a.family === "chord" && a.answer !== "midi")
+            || (a.family === "reading" && a.answer === "selector"));
         }));
         if (pulled > 0) cards = await loadCards();
         if (!alive) return;
@@ -649,6 +795,7 @@ export default function Practice() {
       // forever, so race it — if access arrives later, the device chip lights then.
       const midiInit = initMidi(name => {
         setDevice(name);
+        S.current.hasDevice = !!name;
         if (name) {
           const d = defaultProfile(name);
           S.current.profileId = d.id;
@@ -694,10 +841,13 @@ export default function Practice() {
   const isRun = atom !== null && isRunAtom(atom);
   const isKeys = atom !== null && isKeysAtom(atom);
   const isSpell = atom !== null && isSpellAtom(atom);
+  const isReading = atom !== null && isReadingAtom(atom);
+  const isReadSel = isReading && (atom as ReadingAtom).answer === "selector";
   const tpl = S.current.template;
   const tplBlock = tpl ? tpl.blocks[blockIdxView] : null;
   const subParts = atom === null ? null
     : isKeysAtom(atom) ? [`${atom.clef} clef`, atom.dir === "sigToKey" ? "name the key" : "pick the signature"]
+    : isReadingAtom(atom) ? [`${inst?.clef ?? atom.clef} clef`, atom.answer === "midi" ? "play it" : "name it"]
     : isSpellAtom(atom) ? ["spell it", "any octave"]
     : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave · up and down" : "up and down"]
     : [atom.hand as string, atom.form as string];
@@ -728,6 +878,8 @@ export default function Practice() {
             <div>
               {isKeysAtom(atom) && atom.dir === "sigToKey"
                 ? <div className="h-28 w-72 max-w-[62vw]"><Sig sig={atom.sig} clef={atom.clef} /></div>
+                : isReadingAtom(atom) && inst
+                ? <div className="h-36 w-80 max-w-[64vw]"><StaffView clef={inst.clef} sig={inst.sig} letter={inst.letter} octave={inst.octave} inline={inst.inline} /></div>
                 : <div className="font-serif text-6xl leading-none">{atomTitle(atom)}</div>}
               <div className="mt-2 text-[16px]">
                 <span className="text-[var(--ink)]">{subParts![0]}</span>
@@ -738,6 +890,7 @@ export default function Practice() {
               {phase === "teach" && (
                 <p className="max-w-72 text-[14px] text-[var(--ink2)]">
                   {isKeys ? `${feedback} — tap the highlighted answer`
+                    : isReading ? `${feedback} — ${isReadSel ? "name it" : "play it"}`
                     : isSpell ? `${feedback} — tap them, any octave`
                     : isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}
                 </p>
@@ -748,6 +901,8 @@ export default function Practice() {
                   <span className="text-[var(--felt)]">{feedback}</span>
                   <span className="mt-1 block text-[13px] text-[var(--ink2)]">
                     {isKeys ? "Tap the right one — or tap here to continue"
+                      : isReadSel ? "Name it — or tap here to continue"
+                      : isReading ? "Play it — or tap here to continue"
                       : isSpell ? "Tap the tones — or tap here to continue"
                       : isRun ? "Walk it from the bottom — or tap here to continue"
                       : "Play it together — or tap to continue"}
@@ -791,12 +946,15 @@ export default function Practice() {
       {/* the widget roster replaces the keybed for choice answers (U2 §4);
           key proportions hold in any orientation (U2): height follows width, never toothpicks */}
       {phase !== "interstitial" && phase !== "done" && (
-        <section className={`${isKeys || (atom === null && family === "keys") ? "h-[56dvh]" : "h-[min(44dvh,24vw)] min-h-20"} shrink-0 px-2 pb-2`}>
+        <section className={`${isKeys || isReadSel || (atom === null && family === "keys") ? "h-[56dvh]" : "h-[min(44dvh,24vw)] min-h-20"} shrink-0 px-2 pb-2`}>
           <div className="h-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1" style={{ containerType: "size" }}>
             {atom && isKeysAtom(atom) ? (
               atom.dir === "sigToKey"
                 ? <KeyWheel mode={atom.mode} states={picks} onPick={handlePick} />
                 : <SigGrid clef={atom.clef} states={picks} onPick={handlePick} />
+            ) : isReadSel && inst ? (
+              <NoteSelector doubles={doubles} onCommit={handleReadingPick}
+                reveal={phase === "teach" || phase === "reconcile" ? { letter: inst.letter, inline: inst.eff, octave: inst.octave } : null} />
             ) : atom === null && (family === "keys" || tpl !== null) ? null : (
               <Keybed states={keys} labels={phase === "teach" && labels ? labels : undefined}
                 onKeyTap={isSpell ? spellInput : undefined} />

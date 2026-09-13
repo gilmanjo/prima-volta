@@ -15,6 +15,11 @@ export const KNOWLEDGE_WINDOW_MS = 5000;   // F1 §Grading — one generous wind
 
 export const BOUT_IDLE_MS = 20 * 60_000;   // 08 §6 — the idle clock is the only closer
 
+// F2 single-note reading windows (v1: the T5 flash ladder arrives later; until then the
+// gate is the tighter latency window, same shape as F4's).
+export const READ_LEARN_WINDOW_MS = 5000;
+export const READ_GATE_WINDOW_MS = 900;
+
 // Practice-local steps (04 §2) — item-denominated with a clock fallback.
 export const CONFIRM_AFTER_ITEMS = 20;
 export const CONFIRM_AFTER_MS = 10 * 60_000;
