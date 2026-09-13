@@ -8,7 +8,7 @@ import { RETENTION_TARGET } from "../core/constants";
 import { loadCards } from "../services/store";
 
 const FAMILIES: { name: string; sub: string; href?: string }[] = [
-  { name: "Keys & signatures", sub: "staff notation recognition" },
+  { name: "Keys & signatures", sub: "staff notation recognition", href: "/practice?family=keys" },
   { name: "Chords", sub: "triads and tetrads", href: "/practice?family=chord" },
   { name: "Scales", sub: "major, minor, etc.", href: "/practice?family=scale" },
   { name: "Arpeggios", sub: "broken chord sequences", href: "/practice?family=arp" },

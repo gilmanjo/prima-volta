@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* SMuFL engraving glyphs — Bravura Text (SIL OFL, Steinberg; license alongside the font).
+   Baseline registration: em = staff height, so a glyph's <text> baseline IS its staff position. */
+@font-face {
+  font-family: "Bravura Text";
+  src: url("/fonts/BravuraText.woff2") format("woff2");
+  font-display: block;
+}
+
 /* Design v2 tokens (11 §Design language): ebony + slate, flat and withholding. */
 :root {
   --bg: #0e1218;

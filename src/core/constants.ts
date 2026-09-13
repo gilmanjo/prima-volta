@@ -11,6 +11,7 @@ export const TRAILING_GRACE_MS = 500;      // 03 §7 — release flourishes afte
 // F4 gate anchor: solid triads HT ♩=66 ≈ one beat ≈ 909 ms (rounded).
 export const CHORD_LEARN_WINDOW_MS = 5000;
 export const CHORD_GATE_WINDOW_MS = 900;
+export const KNOWLEDGE_WINDOW_MS = 5000;   // F1 §Grading — one generous window, never tightens
 
 // Practice-local steps (04 §2) — item-denominated with a clock fallback.
 export const CONFIRM_AFTER_ITEMS = 20;

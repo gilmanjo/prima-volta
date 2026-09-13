@@ -77,6 +77,7 @@ export interface AreaCtx { servedCount: number; nowMs: number; }
 /** Apply one graded rep of this card. Returns the new card + the review row to append. */
 export function applyRep(
   card: DrillCard, res: GradeResult, attemptId: string, ctx: AreaCtx, derived = false, parentAttemptId: string | null = null,
+  gateable = true, // knowledge atoms are tierless and carry no gate (02 §1, F1 §Grading)
 ): { card: DrillCard; row: ReviewRow } {
   const row: ReviewRow = {
     atomId: card.atomId, attemptId, rating: res.rating, latencyMs: res.latencyMs,
@@ -85,7 +86,7 @@ export function applyRep(
   let c: DrillCard = { ...card, lastReviewAt: ctx.nowMs };
   // Gates are spaced-evidence territory (02 §1, log #75): step-phase reps never arm or move
   // a gate in either direction — month-one Good stays month-one (03 §6).
-  if (card.step === "graduated") c = applyGateStreak(c, res);
+  if (gateable && card.step === "graduated") c = applyGateStreak(c, res);
 
   const confirmDue = () => { c.step = "confirm"; c.stepDueItems = ctx.servedCount + CONFIRM_AFTER_ITEMS; c.stepDueMs = ctx.nowMs + CONFIRM_AFTER_MS; };
   const againNowDue = () => { c.step = "againNow"; c.stepDueItems = ctx.servedCount + AGAIN_NOW_AFTER_ITEMS; c.stepDueMs = ctx.nowMs + 2 * 60_000; };

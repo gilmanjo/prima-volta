@@ -48,7 +48,8 @@ export async function saveCard(c: DrillCard): Promise<void> { await store.put("c
 
 export interface AttemptRecord {
   id: string; kind: "drill"; atomId: string; mode: "rehearsal"; profileId: string | null;
-  rawMidi: unknown[]; graderVersion: string; tagsVersion: string; gradeJson: unknown; startedAt: number; boutId: string;
+  rawMidi: unknown[]; rawChoiceJson?: unknown; // widget answers log their event stream instead (10 §4)
+  graderVersion: string; tagsVersion: string; gradeJson: unknown; startedAt: number; boutId: string;
 }
 
 export async function appendAttempt(a: AttemptRecord): Promise<void> {

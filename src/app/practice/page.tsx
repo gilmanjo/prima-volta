@@ -7,9 +7,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Keybed, type KeyState } from "../../components/Keybed";
 import {
-  atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, subsumedBy, PC_NAMES,
-  type ArpAtom, type ChordAtom, type DrillAtom, type ScaleAtom,
+  atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, keyNameOf, relativeOf, sigSpelling, subsumedBy, PC_NAMES,
+  type ArpAtom, type ChordAtom, type DrillAtom, type KeysAtom, type ScaleAtom,
 } from "../../core/catalog";
+import { Sig } from "../../components/Sig";
+import { KeyWheel, SigGrid, type PickState } from "../../components/KeysWidgets";
+import { gradeChoice } from "../../core/grader/choice";
 import { next as fillerNext, noteServed, type FillerState } from "../../core/filler";
 import { gradeDiscreteChord } from "../../core/grader/discrete";
 import { runLabels } from "../../core/fingering";
@@ -18,7 +21,7 @@ import { buildRun, runTempo, type Run } from "../../core/runs";
 import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from "../../core/scheduler";
 import { ulid } from "../../core/ulid";
 import type { NoteEvent, Pc } from "../../core/types";
-import { CHORD_SPREAD_MS, RUN_BEATS_PER_BAR } from "../../core/constants";
+import { CHORD_SPREAD_MS, KNOWLEDGE_WINDOW_MS, RUN_BEATS_PER_BAR } from "../../core/constants";
 import { defaultProfile, initMidi, onNote } from "../../services/midi";
 import { startRunClock, type RunClock } from "../../services/metronome";
 import { ensureAudio, ui } from "../../services/uiAudio";
@@ -27,14 +30,16 @@ import { appendAttempt, appendReview, loadCards, pushOutbox, saveCard } from "..
 type Phase = "init" | "teach" | "prompt" | "countin" | "run" | "reconcile" | "good" | "next" | "polishing" | "unavailable";
 const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never bleeds in (U2)
 
-type Family = "chord" | "scale" | "arp";
-const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios" };
+type Family = "chord" | "scale" | "arp" | "keys";
+const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures" };
 
 const CHORD_POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
   .filter(a => a.answer === "midi" && !a.stream && a.cue === "name" && a.form === "blocked")
   .sort(compareAdmission);
 
 function poolFor(f: Family): DrillAtom[] {
+  if (f === "keys")
+    return (catalog.defaults("keys") as KeysAtom[]).sort(compareAdmission);
   if (f === "scale") // keysig cue is engraved — staff territory, Phase 2
     return (catalog.defaults("scale") as ScaleAtom[]).filter(a => a.cue === "name").sort(compareAdmission);
   if (f === "arp") // alternating is the T6 capstone — its handoff grading comes later
@@ -43,6 +48,18 @@ function poolFor(f: Family): DrillAtom[] {
 }
 
 const isRunAtom = (a: DrillAtom): a is ScaleAtom | ArpAtom => a.family === "scale" || a.family === "arp";
+const isKeysAtom = (a: DrillAtom): a is KeysAtom => a.family === "keys";
+
+/** Confirmation copy (F1 §Variants): sig→key reveals the relative pairing (and the ±6
+ *  enharmonic); key→sig spells the accidentals in order. */
+function keysConfirmation(a: KeysAtom): string {
+  if (a.dir === "sigToKey") {
+    const enh = a.sig === 6 ? (a.mode === "major" ? " (= G♭ major)" : " (= e♭ minor)")
+      : a.sig === -6 ? (a.mode === "major" ? " (= F♯ major)" : " (= d♯ minor)") : "";
+    return `${keyNameOf(a.sig, a.mode)}${enh} · relative of ${relativeOf(a.sig, a.mode)}`;
+  }
+  return sigSpelling(a.sig);
+}
 
 export default function Practice() {
   const [phase, setPhase] = useState<Phase>("init");
@@ -54,6 +71,7 @@ export default function Practice() {
   const [beat, setBeat] = useState<{ b: number; cIn: boolean } | null>(null);
   const [bpm, setBpm] = useState<number>(60);
   const [labels, setLabels] = useState<Record<number, string> | null>(null);
+  const [picks, setPicks] = useState<Record<number, PickState>>({});
 
   const S = useRef<{
     filler: FillerState; pool: DrillAtom[]; served: number; boutId: string; profileId: string | null;
@@ -78,6 +96,7 @@ export default function Practice() {
 
   const expectedKeyStates = useCallback((a: DrillAtom, state: KeyState): Record<number, KeyState> => {
     const out: Record<number, KeyState> = {};
+    if (isKeysAtom(a)) return out; // choice atoms answer on widgets, not the keybed
     if (isRunAtom(a)) {
       for (const m of buildRun(a).pathMidis) out[m] = state;
       return out;
@@ -122,6 +141,19 @@ export default function Practice() {
     setAtom(res.atom);
     setFeedback("");
     setLabels(null);
+    setPicks({});
+    if (isKeysAtom(res.atom)) {
+      st.run = null;
+      if (res.kind === "teach") {
+        // teach shows the pairing: the correct option highlighted; tap it to continue (U2 Teach)
+        setPicks({ [res.atom.sig]: "correct" });
+        setFeedback(keysConfirmation(res.atom));
+        setPhase("teach");
+      } else {
+        setPhase("prompt");
+      }
+      return;
+    }
     if (isRunAtom(res.atom)) {
       st.run = buildRun(res.atom);
       if (res.kind === "teach") {
@@ -170,11 +202,13 @@ export default function Practice() {
     }, delayMs);
   }, [serve]);
 
-  const logAttempt = useCallback((a: DrillAtom, attemptId: string, nowMs: number, gradeJson: Record<string, unknown>) => {
+  const logAttempt = useCallback((a: DrillAtom, attemptId: string, nowMs: number, gradeJson: Record<string, unknown>, rawChoiceJson?: unknown) => {
     const st = S.current;
     void appendAttempt({
       id: attemptId, kind: "drill", atomId: a.id, mode: "rehearsal", profileId: st.profileId,
-      rawMidi: st.collected, graderVersion: "v1", tagsVersion: "v1", gradeJson,
+      rawMidi: rawChoiceJson === undefined ? st.collected : [],
+      ...(rawChoiceJson !== undefined ? { rawChoiceJson } : {}),
+      graderVersion: "v1", tagsVersion: "v1", gradeJson,
       startedAt: Math.round(nowMs - (performance.now() - st.promptAt)), boutId: st.boutId,
     });
     if (++st.sinceSync >= 8) { st.sinceSync = 0; void pushOutbox(); }
@@ -249,11 +283,65 @@ export default function Practice() {
     advance(850);
   }, [advance, clearRunTimers, expectedKeyStates, logAttempt]);
 
+  /** Widget taps (F1): the answer path for choice atoms — commit on tap (03 §3). */
+  const handlePick = useCallback((sig: number) => {
+    const a = atomRef.current;
+    const st = S.current;
+    const ph = phaseRef.current;
+    if (!a || !isKeysAtom(a)) return;
+    if (ph === "teach") {
+      if (sig !== a.sig) { setPicks(p => ({ ...p, [sig]: "wrong" })); return; }
+      const taught = afterTeach(st.card!);
+      st.filler.cards.set(a.id, taught);
+      void saveCard(taught);
+      advance(250);
+      return;
+    }
+    if (ph === "reconcile") {
+      // continue by tapping the correct answer — instant (U2's reconciliation rule)
+      if (sig === a.sig) { ui.good(); advance(250); }
+      else setPicks(p => ({ ...p, [sig]: "wrong" }));
+      return;
+    }
+    if (ph !== "prompt" || st.finalized) return;
+    st.finalized = true;
+    const commitAt = performance.now();
+    const expectedSym = a.dir === "sigToKey" ? keyNameOf(a.sig, a.mode) : `sig:${a.sig}`;
+    const playedSym = a.dir === "sigToKey" ? keyNameOf(sig, a.mode) : `sig:${sig}`;
+    const res = gradeChoice(
+      { expectedSym, windowMs: KNOWLEDGE_WINDOW_MS, promptAtMs: st.promptAt, tags: [`key:${keyNameOf(a.sig, a.mode)}`] },
+      playedSym, commitAt,
+    );
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    // knowledge atoms are tierless — no gate arms or releases (02 §1, F1 §Grading)
+    const { card: after, row } = applyRep(st.card!, res, attemptId, { servedCount: st.served, nowMs }, false, null, false);
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs, { rating: res.rating, latencyMs: res.latencyMs, errors: res.errorEvents.length },
+      { dir: a.dir, expectedSym, tapped: [{ sym: playedSym, atMs: Math.round(commitAt - st.promptAt) }] });
+    void appendReview({ id: ulid(), ...row });
+    if (res.rating === 1) {
+      ui.err();
+      setPicks({ [a.sig]: "correct", [sig]: "wrong" });
+      setFeedback(`Expected ${a.dir === "sigToKey" ? keyNameOf(a.sig, a.mode) : sigSpelling(a.sig)}`);
+      setPhase("reconcile");
+      return;
+    }
+    if (res.rating === 3) ui.good(); else ui.hard();
+    setPicks({ [sig]: "correct" });
+    setFeedback(`${keysConfirmation(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setPhase("good");
+    advance(1200); // the confirmation carries the relative pairing — worth a breath more
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advance, logAttempt]);
+
   const handleNote = useCallback((n: { midi: number; onMs: number; vel: number }) => {
     const a = atomRef.current;
     const st = S.current;
     const ph = phaseRef.current;
     if (!a) return;
+    if (isKeysAtom(a)) return; // choice atoms answer on widgets — the piano is silent here
 
     if (isRunAtom(a)) {
       if (ph === "teach") {
@@ -360,7 +448,7 @@ export default function Practice() {
     const arm = () => ensureAudio();
     document.addEventListener("pointerdown", arm);
     const f = new URLSearchParams(window.location.search).get("family");
-    const fam: Family = f === "scale" || f === "arp" ? f : "chord";
+    const fam: Family = f === "scale" || f === "arp" || f === "keys" ? f : "chord";
     S.current.pool = poolFor(fam);
     setFamily(fam);
     (async () => {
@@ -398,7 +486,9 @@ export default function Practice() {
   }, []);
 
   const isRun = atom !== null && isRunAtom(atom);
+  const isKeys = atom !== null && isKeysAtom(atom);
   const subParts = atom === null ? null
+    : isKeysAtom(atom) ? [`${atom.clef} clef`, atom.dir === "sigToKey" ? "name the key" : "pick the signature"]
     : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave" : "up-down"]
     : [atom.hand as string, atom.form as string];
 
@@ -426,7 +516,9 @@ export default function Practice() {
         {(phase === "teach" || phase === "prompt" || phase === "countin" || phase === "run" || phase === "reconcile" || phase === "good" || phase === "next") && atom && (
           <div className={`flex w-full items-end justify-between gap-6 transition-opacity duration-200 ease-out ${phase === "next" ? "opacity-0" : "opacity-100"}`}>
             <div>
-              <div className="font-serif text-6xl leading-none">{atomTitle(atom)}</div>
+              {isKeysAtom(atom) && atom.dir === "sigToKey"
+                ? <div className="h-28 w-72 max-w-[62vw]"><Sig sig={atom.sig} clef={atom.clef} /></div>
+                : <div className="font-serif text-6xl leading-none">{atomTitle(atom)}</div>}
               <div className="mt-2 text-[16px]">
                 <span className="text-[var(--ink)]">{subParts![0]}</span>
                 <span className="text-[var(--ink2)]"> · {subParts![1]}</span>
@@ -441,13 +533,17 @@ export default function Practice() {
                   <span className="ml-1 text-[12px] text-[var(--ink2)]">♩={bpm}</span>
                 </div>
               )}
-              {phase === "teach" && <p className="text-[14px] text-[var(--ink2)]">{isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}</p>}
+              {phase === "teach" && (
+                <p className="max-w-72 text-[14px] text-[var(--ink2)]">
+                  {isKeys ? `${feedback} — tap the highlighted answer` : isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}
+                </p>
+              )}
               {phase === "good" && <p className="text-[14px] text-[var(--good)]">{feedback}</p>}
               {phase === "reconcile" && (
                 <button onClick={() => advance(0)} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-left text-[14px] leading-relaxed text-[var(--ink)]">
                   <span className="text-[var(--felt)]">{feedback}</span>
                   <span className="mt-1 block text-[13px] text-[var(--ink2)]">
-                    {isRun ? "Tap to continue" : "Play it together — or tap to continue"}
+                    {isKeys ? "Tap the right one — or tap here to continue" : isRun ? "Tap to continue" : "Play it together — or tap to continue"}
                   </span>
                 </button>
               )}
@@ -457,10 +553,17 @@ export default function Practice() {
         {phase === "init" && <p className="mx-auto text-[14px] text-[var(--muted)]">loading…</p>}
       </section>
 
-      {/* key proportions hold in any orientation (U2): height follows width, never toothpicks */}
-      <section className="h-[min(44dvh,24vw)] min-h-20 shrink-0 px-2 pb-2">
+      {/* the widget roster replaces the keybed for choice answers (U2 §4);
+          key proportions hold in any orientation (U2): height follows width, never toothpicks */}
+      <section className={`${family === "keys" ? "h-[56dvh]" : "h-[min(44dvh,24vw)] min-h-20"} shrink-0 px-2 pb-2`}>
         <div className="h-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1">
-          <Keybed states={keys} labels={phase === "teach" && labels ? labels : undefined} />
+          {atom && isKeysAtom(atom) ? (
+            atom.dir === "sigToKey"
+              ? <KeyWheel mode={atom.mode} states={picks} onPick={handlePick} />
+              : <SigGrid clef={atom.clef} states={picks} onPick={handlePick} />
+          ) : family === "keys" ? null : (
+            <Keybed states={keys} labels={phase === "teach" && labels ? labels : undefined} />
+          )}
         </div>
       </section>
     </main>

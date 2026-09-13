@@ -32,8 +32,16 @@ export interface ArpAtom extends CatalogAtom {
   start: "root";
 }
 
+export interface KeysAtom extends CatalogAtom {
+  family: "keys";
+  sig: number;                 // −6 … +6 (−6 = G♭, behind its scope toggle)
+  mode: "major" | "minor";
+  clef: "treble" | "bass";
+  dir: "sigToKey" | "keyToSig";
+}
+
 /** The playable-atom union the filler and player serve. */
-export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom;
+export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom | KeysAtom;
 
 const atoms = (catalogJson as { atoms: CatalogAtom[] }).atoms;
 const byId = new Map(atoms.map(a => [a.id, a]));
@@ -91,10 +99,16 @@ export function arpAdmissionKey(a: ArpAtom): number[] {
   return [stage, basisIdx, waveOf(a.root), HAND_ORDER[a.hand]];
 }
 
-const FAMILY_ORDER: Record<string, number> = { chord: 0, scale: 1, arp: 2 };
+/** Admission key for F1 atoms (tierless): the key wave, then direction/clef/mode. */
+export function keysAdmissionKey(a: KeysAtom): number[] {
+  return [waveOf(majorTonicPc(a.sig)), a.dir === "keyToSig" ? 1 : 0, a.clef === "bass" ? 1 : 0, a.mode === "minor" ? 1 : 0];
+}
+
+const FAMILY_ORDER: Record<string, number> = { keys: 0, chord: 1, scale: 2, arp: 3 };
 
 function admissionKey(a: DrillAtom): number[] {
   const fam = FAMILY_ORDER[a.family] ?? 9;
+  if (a.family === "keys") return [fam, ...keysAdmissionKey(a)];
   if (a.family === "scale") return [fam, ...scaleAdmissionKey(a)];
   if (a.family === "arp") return [fam, ...arpAdmissionKey(a)];
   return [fam, ...chordAdmissionKey(a)];
@@ -111,6 +125,7 @@ export function compareAdmission(a: DrillAtom, b: DrillAtom): number {
 
 /** The interleave identity (04 §6): what "same root / same quality" means per family. */
 export function identityOf(a: DrillAtom): { root: unknown; quality: unknown } {
+  if (a.family === "keys") return { root: majorTonicPc(a.sig), quality: a.dir };
   if (a.family === "scale") return { root: a.key, quality: a.type };
   if (a.family === "arp") return { root: a.root, quality: a.basis };
   return { root: a.root, quality: a.quality };
@@ -158,8 +173,36 @@ const SCALE_LABEL: Record<ScaleType, string> = {
 };
 const ARP_LABEL: Record<string, string> = { maj: "major", min: "minor", dom7: "dominant 7th", dim7: "diminished 7th" };
 
+// ---- F1 key/signature vocabulary (proper spellings; sig indexed −6…+6 via [sig+6]) ----
+const MAJOR_KEYS = ["G♭", "D♭", "A♭", "E♭", "B♭", "F", "C", "G", "D", "A", "E", "B", "F♯"];
+const MINOR_KEYS = ["e♭", "b♭", "f", "c", "g", "d", "a", "e", "b", "f♯", "c♯", "g♯", "d♯"];
+const SHARPS_ORDER = ["F♯", "C♯", "G♯", "D♯", "A♯", "E♯"];
+const FLATS_ORDER = ["B♭", "E♭", "A♭", "D♭", "G♭", "C♭"];
+
+export function majorTonicPc(sig: number): Pc {
+  return (((sig * 7) % 12) + 12) % 12 as Pc;
+}
+
+/** The key a signature names, in the prompted mode ("A♭ major" / "f minor"). */
+export function keyNameOf(sig: number, mode: "major" | "minor"): string {
+  return mode === "major" ? `${MAJOR_KEYS[sig + 6]} major` : `${MINOR_KEYS[sig + 6]} minor`;
+}
+
+/** The relative partner, revealed at confirmation (F1 §Variants). */
+export function relativeOf(sig: number, mode: "major" | "minor"): string {
+  return keyNameOf(sig, mode === "major" ? "minor" : "major");
+}
+
+/** The signature's accidentals, spelled in order (key→sig confirmation, F1 §Variants). */
+export function sigSpelling(sig: number): string {
+  if (sig === 0) return "no sharps or flats";
+  const src = sig > 0 ? SHARPS_ORDER : FLATS_ORDER;
+  return src.slice(0, Math.abs(sig)).join(" · ");
+}
+
 /** The prompt title, per family — plain words, never model nouns (hub rule). */
 export function atomTitle(a: DrillAtom): string {
+  if (a.family === "keys") return keyNameOf(a.sig, a.mode);
   if (a.family === "scale") return `${PC_NAMES[a.key]} ${SCALE_LABEL[a.type]}`;
   if (a.family === "arp") return `${PC_NAMES[a.root]} ${ARP_LABEL[a.basis]} arpeggio`;
   return chordSymbol(a);
