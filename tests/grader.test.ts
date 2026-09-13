@@ -87,7 +87,7 @@ describe("discrete grader (03 §4/§6/§7)", () => {
   });
 
   it("HT: embedded results judge each hand on its own window (02 §3)", () => {
-    const notes = [n(48, 900), n(52, 905), n(55, 910), n(72, 950), n(76, 960), n(79, 1000)];
+    const notes = [n(48, 900), n(52, 905), n(55, 910), n(72, 950), n(76, 960), n(79, 975)];
     expect(splitHands(notes, CMAJ).LH.length).toBe(3);
     const g = gradeDiscreteChord(spec({ hand: "HT" }), notes, { LH: "lh1", RH: "rh1", embeddedWindowMs: 5000 });
     expect(g.primary.rating).toBe(3);
@@ -109,5 +109,45 @@ describe("discrete grader (03 §4/§6/§7)", () => {
     expect(g.primary.rating).toBe(3);
     expect(g.embedded.get("lh1")!.clean).toBe(true);
     expect(g.embedded.get("lh1")!.inWindow).toBe(false);
+  });
+});
+
+// The simultaneity law (03 §4, log #76): one attack, one window — and the verdict can never
+// depend on what order the notes arrive or are examined in (splitHands sorts by midi).
+describe("simultaneity — sequential entry never passes, in ANY order", () => {
+  const perms = <T,>(xs: T[]): T[][] =>
+    xs.length <= 1 ? [xs] : xs.flatMap((x, i) => perms([...xs.slice(0, i), ...xs.slice(i + 1)]).map(p => [x, ...p]));
+  const take = (midis: number[], gapMs: number) => midis.map((m, i) => n(m, 1000 + i * gapMs));
+  const CG: Pc[] = [7, 0, 4]; // C/G — bass first
+
+  it("a single-hand chord arpeggiated a tone at a time → Again with dropChordTone, every order", () => {
+    for (const p of perms([55, 60, 64])) { // the CORRECT C/G voicing, just not together
+      const g = gradeDiscreteChord(spec({ pcs: CG, inversion: 2 }), take(p, 700));
+      expect(g.primary.rating).toBe(1);
+      expect(g.primary.errorEvents.some(e => e.type === "dropChordTone")).toBe(true);
+    }
+  });
+
+  it("an HT chord arpeggiated a tone at a time → Again, every order (Jordan's inversion-cheat report)", () => {
+    for (const p of perms([43, 48, 52, 55, 60, 64])) { // correct HT C/G tones, entered sequentially
+      const g = gradeDiscreteChord(spec({ pcs: CG, hand: "HT", inversion: 2 }), take(p, 700));
+      expect(g.primary.rating).toBe(1);
+    }
+  });
+
+  it("HT cannot pass as sequential hands — both hands share one spread window", () => {
+    const hs = [n(48, 1000), n(52, 1010), n(55, 1020), n(60, 3000), n(64, 3010), n(67, 3020)];
+    const g = gradeDiscreteChord(spec({ hand: "HT" }), hs, { LH: "lh1", RH: "rh1", embeddedWindowMs: 5000 });
+    expect(g.primary.rating).toBe(1);
+    expect(g.primary.errorEvents.some(e => e.type === "dropChordTone")).toBe(true);
+    // the hand that DID attack at the anchor still earns its honest embedded credit (02 §3)
+    expect(g.embedded.get("lh1")!.clean).toBe(true);
+    expect(g.embedded.get("rh1")!.clean).toBe(false);
+  });
+
+  it("a genuine two-hand attack inside the window still passes", () => {
+    const together = [n(43, 1000), n(48, 1004), n(52, 1011), n(55, 1030), n(60, 1038), n(64, 1051)];
+    const g = gradeDiscreteChord(spec({ pcs: CG, hand: "HT", inversion: 2 }), together);
+    expect(g.primary.rating).toBe(3);
   });
 });

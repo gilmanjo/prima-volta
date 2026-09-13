@@ -1,9 +1,11 @@
 // Discrete-answer grader (03 §4/§6/§7): one chord/note prompt → judgment.
 // Laws implemented here:
 //  · name-cue = pitch classes, any octave; doubling a named pc is never an error (03 §7)
-//  · all tones inside the spread window; a missing tone after it closes logs dropChordTone (03 §4)
+//  · one simultaneous attack: every tone within the spread window of the attack's FIRST note,
+//    both hands inside the same window for HT — sequential hands or a tone at a time never pass;
+//    a tone landing after the window closed logs dropChordTone (03 §4)
 //  · any error event → Again, corrected included; clean-over-window → Hard; clean-in-window → Good (03 §6)
-//  · HT reps also grade each hand on its own terms for the lattice (02 §3) — split at the largest gap
+//  · HT reps also grade each hand on its own terms for the lattice (02 §3) — score-based split
 import { CHORD_SPREAD_MS, TRAILING_GRACE_MS } from "../constants";
 import type { ErrorEvent, GradeResult, GradedAttempt, NoteEvent, Pc } from "../types";
 
@@ -16,7 +18,11 @@ export interface DiscreteChordSpec {
   key?: string;              // for error-event tagging
 }
 
-function gradeOneHand(pcs: Pc[], notes: NoteEvent[], spec: DiscreteChordSpec, hand: "RH" | "LH"): GradeResult {
+function gradeOneHand(
+  pcs: Pc[], notesIn: NoteEvent[], spec: DiscreteChordSpec, hand: "RH" | "LH",
+  attackAnchorMs?: number, // HT passes the WHOLE attack's first onset: both hands share one window (03 §4)
+): GradeResult {
+  const notes = [...notesIn].sort((a, b) => a.onMs - b.onMs); // judged in time order, never input order
   const want = new Set(pcs);
   const errors: ErrorEvent[] = [];
   const matchedAt = new Map<Pc, number>();
@@ -34,12 +40,6 @@ function gradeOneHand(pcs: Pc[], notes: NoteEvent[], spec: DiscreteChordSpec, ha
       // (an extra hand is not a flourish); the grace covers only what comes after (03 §7)
       if (dt > CHORD_SPREAD_MS && dt <= TRAILING_GRACE_MS) continue;
     }
-    // spread check FIRST: a note arriving after the window closed, while tones were still missing,
-    // means those tones were dropped (03 §4) — even if this very note completes the chord late.
-    if (firstOn !== null && completeAt === null && n.onMs - firstOn > CHORD_SPREAD_MS
-        && matchedAt.size < want.size && !errors.some(e => e.type === "dropChordTone")) {
-      errors.push({ type: "dropChordTone", hand, tags: [] });
-    }
     const pc = ((n.midi % 12) + 12) % 12 as Pc;
     if (firstOn === null) firstOn = n.onMs;
     if (lowestSounded === null || n.midi < lowestSounded) lowestSounded = n.midi;
@@ -52,6 +52,14 @@ function gradeOneHand(pcs: Pc[], notes: NoteEvent[], spec: DiscreteChordSpec, ha
       errors.push({ type: "substitution", playedMidi: n.midi, expectedSym: [...want].join(","), hand, tags: [] });
     }
     if (matchedAt.size === want.size && completeAt === null) completeAt = n.onMs;
+  }
+  // the simultaneity law (03 §4): every expected tone inside the spread window of the attack's
+  // first note — a tone that landed after the window closed was dropped from the attack.
+  const anchor = attackAnchorMs ?? firstOn;
+  if (anchor !== null) {
+    for (const t of matchedAt.values()) {
+      if (t - anchor > CHORD_SPREAD_MS) errors.push({ type: "dropChordTone", hand, tags: [] });
+    }
   }
   if (completeAt === null) {
     // never completed: each missing tone is a deletion
@@ -108,8 +116,11 @@ export function gradeDiscreteChord(
     return { primary: gradeOneHand(spec.pcs, notes, spec, spec.hand), embedded: new Map() };
   }
   const { LH, RH } = splitHands(notes, spec.pcs);
-  const lh = gradeOneHand(spec.pcs, LH, spec, "LH");
-  const rh = gradeOneHand(spec.pcs, RH, spec, "RH");
+  // one attack, one window: both hands anchor to the whole take's first onset (03 §4) —
+  // playing the hands in sequence can never pass an HT atom.
+  const anchor = notes.length ? Math.min(...notes.map(x => x.onMs)) : undefined;
+  const lh = gradeOneHand(spec.pcs, LH, spec, "LH", anchor);
+  const rh = gradeOneHand(spec.pcs, RH, spec, "RH", anchor);
   // primary = the HT judgment: both hands' tone sets, all errors combined, latency = later completion
   const errors = [...lh.errorEvents, ...rh.errorEvents];
   const clean = lh.clean && rh.clean;

@@ -84,11 +84,11 @@ export default function Practice() {
     }
   }, [expectedKeyStates]);
 
-  /** The between-items beat (U2): a blank breath + the serve tick, so the next prompt
-   *  reads as NEW even when it differs only by hand. */
+  /** The between-items beat (U2): the prompt fades out, a breath with the serve tick, the next
+   *  fades in — so the next prompt reads as NEW even when it differs only by hand. */
   const advance = useCallback((delayMs = 0) => {
     setTimeout(() => {
-      setPhase("next"); setAtom(null); setKeys({}); setFeedback("");
+      setPhase("next"); setKeys({}); // atom stays mounted so the outgoing prompt can fade
       ui.tick();
       setTimeout(serve, 380);
     }, delayMs);
@@ -253,8 +253,8 @@ export default function Practice() {
             <span className="ml-2 text-[var(--accent-hi)]">check again</span>
           </button>
         )}
-        {(phase === "teach" || phase === "prompt" || phase === "reconcile" || phase === "good") && atom && (
-          <div className="flex w-full items-end justify-between gap-6">
+        {(phase === "teach" || phase === "prompt" || phase === "reconcile" || phase === "good" || phase === "next") && atom && (
+          <div className={`flex w-full items-end justify-between gap-6 transition-opacity duration-200 ease-out ${phase === "next" ? "opacity-0" : "opacity-100"}`}>
             <div>
               <div className="font-serif text-6xl leading-none">{chordSymbol(atom)}</div>
               <div className="mt-2 text-[16px]">
@@ -274,11 +274,11 @@ export default function Practice() {
             </div>
           </div>
         )}
-        {phase === "next" && <p className="mx-auto text-[13px] text-[var(--muted)]">·</p>}
         {phase === "init" && <p className="mx-auto text-[14px] text-[var(--muted)]">loading…</p>}
       </section>
 
-      <section className="h-[44dvh] min-h-36 shrink-0 px-2 pb-2">
+      {/* key proportions hold in any orientation (U2): height follows width, never toothpicks */}
+      <section className="h-[min(44dvh,24vw)] min-h-20 shrink-0 px-2 pb-2">
         <div className="h-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1">
           <Keybed states={keys} />
         </div>

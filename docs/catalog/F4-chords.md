@@ -48,7 +48,7 @@
 
 ## Grading
 
-Rehearsal mode. Blocked: all tones within the 80ms spread window; a missing tone after the window closes logs `dropChordTone` (the tag behind "misses the 7th in flat keys"). **The slash bass is graded**: each hand's lowest tone must be the inversion's bass — the right tones voiced over the wrong bass log `inversion:N` (playing root position for C/G is an error; the voicing *is* the skill). **Each expected tone sounds once per hand**: extra keys are insertions — hands stay honor-system (MIDI can't see them), but note counts don't. Broken: order + evenness. Latency = prompt → last tone.
+Rehearsal mode. Blocked: **one simultaneous attack** — every tone inside the 80ms spread window of the attack's first note, both hands in that same window for hands-together (sequential hands or a tone at a time never pass, 03 §4); a tone landing after the window closes logs `dropChordTone` (the tag behind "misses the 7th in flat keys"). **The slash bass is graded**: each hand's lowest tone must be the inversion's bass — the right tones voiced over the wrong bass log `inversion:N` (playing root position for C/G is an error; the voicing *is* the skill). **Each expected tone sounds once per hand**: extra keys are insertions — hands stay honor-system (MIDI can't see them), but note counts don't. Broken: order + evenness. Latency = prompt → last tone.
 
 **Octave policy:** staff-cue exact octave, always; name-cue any octave, always — the cue type defines what register knowledge is being tested, so the policy never shifts by tier.
 

@@ -13,7 +13,7 @@ One screen, four zones, every drill modality. Entered from any launcher; exits b
 
 ## Rep flow (rehearsal) — errors stop for reconciliation
 
-Answer → instant verdict. Correct = green LED sweep + latency chip (Spline Mono) + the UI ding, then a short **between-items beat** (a blank breath + the serve tick) so the next prompt reads as *new* even when it differs only by hand. **Error = the flow stops** (hub rule): felt-red on the offending keys, **expected vs played side by side on the keybed** (engraving highlighted for staff cues) with the expected tones named in the feedback line, and a **replay affordance** where hearing helps — yours vs expected via smplr (chords, intervals). Continue by tap — **or by playing the correct answer as a fresh attack** (the tones together, after a settle-beat that keeps the failed take's tail from bleeding in; loose noodling never advances). The card's rating already took the hit (03); the pause is for understanding, not punishment.
+Answer → instant verdict. Correct = green LED sweep + latency chip (Spline Mono) + the UI ding, then a short **between-items beat** — the prompt fades out, a breath with the serve tick, the next fades in (a soft cross-fade, never a hard blank flash) — so the next prompt reads as *new* even when it differs only by hand. **Error = the flow stops** (hub rule): felt-red on the offending keys, **expected vs played side by side on the keybed** (engraving highlighted for staff cues) with the expected tones named in the feedback line, and a **replay affordance** where hearing helps — yours vs expected via smplr (chords, intervals). Continue by tap — **or by playing the correct answer as a fresh attack** (the tones together, after a settle-beat that keeps the failed take's tail from bleeding in; loose noodling never advances). The card's rating already took the hit (03); the pause is for understanding, not punishment.
 
 ## Player copy & display rules
 
@@ -22,6 +22,7 @@ Answer → instant verdict. Correct = green LED sweep + latency chip (Spline Mon
 - The keybed carries **no note-name labels** during drills. Teach states show **fingering numerals on the path dots** (sourced, never invented) — the sequence of a scale is obvious and isn't numbered.
 - The **metronome strip exists only when the item is pulsed** — a free-tempo drill shows none.
 - The latency chip shows **milliseconds after an answer, never status words** ("paused", "reconcile" and kin are banned).
+- The keybed keeps **piano-like key proportions in every orientation**: its height follows its width, so portrait never renders toothpick keys — landscape remains the designed home.
 
 ## Teach states (ungraded, rehearsal context — always)
 
