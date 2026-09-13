@@ -1,15 +1,15 @@
 // The block-filler (08 §4 — chooses; consumes 04's exports). One item at a time:
 // steps first → weakest next → frontier on pull → polishing; "unavailable" when the
 // context can't serve the area at all. Tiny-area sovereignty bypasses interleaving (04 §6).
-import { compareAdmission, type ChordAtom } from "./catalog";
+import { compareAdmission, identityOf, type DrillAtom } from "./catalog";
 import { POOL_THIN, RETENTION_TARGET, TRICKLE_PER_10MIN } from "./constants";
 import {
   interleaveOk, newCard, retrievability, servingPriority, stepRipe, type AreaCtx, type DrillCard,
 } from "./scheduler";
 
 export type FillerResult =
-  | { kind: "teach"; atom: ChordAtom; card: DrillCard }
-  | { kind: "item"; atom: ChordAtom; card: DrillCard }
+  | { kind: "teach"; atom: DrillAtom; card: DrillCard }
+  | { kind: "item"; atom: DrillAtom; card: DrillCard }
   | { kind: "polishing" }
   | { kind: "unavailable" };
 
@@ -21,7 +21,7 @@ export interface FillerState {
 
 export interface BlockSpec {
   /** Servable atoms in this area, in admission order candidates included (capability-filtered by the app). */
-  pool: ChordAtom[];
+  pool: DrillAtom[];
   /** Tiny-area sovereignty (08 §4): a user-scoped block serves on demand, constraints yield. */
   userScoped?: boolean;
   appetite?: "off" | "trickle" | "eager";
@@ -29,13 +29,13 @@ export interface BlockSpec {
 
 export function next(block: BlockSpec, state: FillerState, ctx: AreaCtx): FillerResult {
   const appetite = block.appetite ?? "trickle";
-  const cardsOf = (a: ChordAtom) => state.cards.get(a.id);
+  const cardsOf = (a: DrillAtom) => state.cards.get(a.id);
 
-  const passesInterleave = (a: ChordAtom) =>
-    interleaveOk(state.recentServed, { root: a.root, quality: a.quality });
+  const passesInterleave = (a: DrillAtom) =>
+    interleaveOk(state.recentServed, identityOf(a));
   // 04 §6's ruled exemption: when the pool cannot satisfy a constraint, the constraint yields —
   // sovereignty is this fallback, not a special mode.
-  const yielding = <T extends { a: ChordAtom }>(xs: T[]): T[] => {
+  const yielding = <T extends { a: DrillAtom }>(xs: T[]): T[] => {
     const ok = xs.filter(x => passesInterleave(x.a));
     return ok.length ? ok : xs;
   };
@@ -43,11 +43,11 @@ export function next(block: BlockSpec, state: FillerState, ctx: AreaCtx): Filler
   // 1 · steps first (un-elapsed steps are skipped, never waited on — 04 §2)
   const ripe = yielding(block.pool
     .map(a => ({ a, c: cardsOf(a) }))
-    .filter((x): x is { a: ChordAtom; c: DrillCard } => !!x.c && stepRipe(x.c, ctx)));
+    .filter((x): x is { a: DrillAtom; c: DrillCard } => !!x.c && stepRipe(x.c, ctx)));
   if (ripe.length) return { kind: "item", atom: ripe[0].a, card: ripe[0].c };
 
   // servable learn-phase cards count as the weak pool's weakest members
-  const introduced = block.pool.map(a => ({ a, c: cardsOf(a) })).filter(x => x.c) as { a: ChordAtom; c: DrillCard }[];
+  const introduced = block.pool.map(a => ({ a, c: cardsOf(a) })).filter(x => x.c) as { a: DrillAtom; c: DrillCard }[];
   const weak = introduced.filter(x =>
     x.c.step === "learn" || (x.c.step === "graduated" && retrievability(x.c, ctx.nowMs) < RETENTION_TARGET));
 
@@ -90,7 +90,7 @@ function trickleOk(state: FillerState, nowMs: number): boolean {
   return state.admittedThisWindow.length < TRICKLE_PER_10MIN;
 }
 
-export function noteServed(state: FillerState, atom: ChordAtom): void {
-  state.recentServed.push({ root: atom.root, quality: atom.quality });
+export function noteServed(state: FillerState, atom: DrillAtom): void {
+  state.recentServed.push(identityOf(atom));
   if (state.recentServed.length > 10) state.recentServed.shift();
 }

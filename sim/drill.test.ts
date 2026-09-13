@@ -48,7 +48,7 @@ function run(p: Persona, days: number, repsPerDay: number) {
       const nowMs = day * 86_400_000 + r * 20_000;
       const res = next({ pool: POOL }, state, { servedCount: served, nowMs });
       if (res.kind === "polishing" || res.kind === "unavailable") continue;
-      const atom = res.atom;
+      const atom = res.atom as ChordAtom; // the sim pool is chords only
       noteServed(state, atom); served++;
       if (res.kind === "teach") {
         g.set(atom.id, 0.35);

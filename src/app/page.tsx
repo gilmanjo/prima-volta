@@ -7,11 +7,11 @@ import { retrievability, type DrillCard } from "../core/scheduler";
 import { RETENTION_TARGET } from "../core/constants";
 import { loadCards } from "../services/store";
 
-const FAMILIES: { name: string; sub: string; live: boolean }[] = [
-  { name: "Keys & signatures", sub: "staff notation recognition", live: false },
-  { name: "Chords", sub: "triads and tetrads", live: true },
-  { name: "Scales", sub: "major, minor, etc.", live: false },
-  { name: "Arpeggios", sub: "broken chord sequences", live: false },
+const FAMILIES: { name: string; sub: string; href?: string }[] = [
+  { name: "Keys & signatures", sub: "staff notation recognition" },
+  { name: "Chords", sub: "triads and tetrads", href: "/practice?family=chord" },
+  { name: "Scales", sub: "major, minor, etc.", href: "/practice?family=scale" },
+  { name: "Arpeggios", sub: "broken chord sequences", href: "/practice?family=arp" },
 ];
 
 export default function Home() {
@@ -35,18 +35,23 @@ export default function Home() {
       </div>
 
       <div className="mt-8 space-y-2">
-        {FAMILIES.map(f => (
-          <div key={f.name}
-            className={`rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-3 ${f.live ? "" : "opacity-45"}`}>
-            <div className="flex items-baseline justify-between">
-              <span className="text-[15px]">{f.name}</span>
-              {f.live && weak !== null && weak > 0 && (
-                <span className="text-xs text-[var(--ink2)]">{weak} weak</span>
-              )}
-            </div>
-            <div className="text-[13px] text-[var(--ink2)]">{f.sub}{!f.live && " · arriving this phase"}</div>
-          </div>
-        ))}
+        {FAMILIES.map(f => {
+          const body = (
+            <>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[15px]">{f.name}</span>
+                {f.href && weak !== null && weak > 0 && (
+                  <span className="text-xs text-[var(--ink2)]">{weak} weak</span>
+                )}
+              </div>
+              <div className="text-[13px] text-[var(--ink2)]">{f.sub}{!f.href && " · arriving this phase"}</div>
+            </>
+          );
+          const cls = "block rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-3";
+          return f.href
+            ? <Link key={f.name} href={f.href} className={cls}>{body}</Link>
+            : <div key={f.name} className={`${cls} opacity-45`}>{body}</div>;
+        })}
       </div>
 
       <Link href="/practice"

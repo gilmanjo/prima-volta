@@ -14,6 +14,27 @@ export interface ChordAtom extends CatalogAtom {
   stream?: boolean;
 }
 
+export type ScaleType = "major" | "minorNatural" | "minorHarmonic" | "minorMelodic" | "chromatic";
+
+export interface ScaleAtom extends CatalogAtom {
+  family: "scale";
+  type: ScaleType;
+  key: Pc;
+  hand: "RH" | "LH" | "HT";
+  cue: "name" | "keysig";
+}
+
+export interface ArpAtom extends CatalogAtom {
+  family: "arp";
+  basis: "maj" | "min" | "dom7" | "dim7";
+  root: Pc;
+  hand: "RH" | "LH" | "HT" | "alternating";
+  start: "root";
+}
+
+/** The playable-atom union the filler and player serve. */
+export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom;
+
 const atoms = (catalogJson as { atoms: CatalogAtom[] }).atoms;
 const byId = new Map(atoms.map(a => [a.id, a]));
 
@@ -47,10 +68,43 @@ export function chordAdmissionKey(a: ChordAtom): number[] {
   return [q, w, tier, a.inversion ?? 0, cue, hand];
 }
 
-export function compareAdmission(a: ChordAtom, b: ChordAtom): number {
-  const ka = chordAdmissionKey(a), kb = chordAdmissionKey(b);
-  for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
+const SCALE_TYPE_ORDER: ScaleType[] = ["major", "minorNatural", "minorHarmonic", "minorMelodic", "chromatic"];
+const ARP_BASIS_ORDER = ["maj", "min", "dom7", "dim7"]; // F6: triads (T1) before sevenths (T4)
+const HAND_ORDER = { RH: 0, LH: 1, HT: 2, alternating: 3 };
+
+/** Admission key for F5 atoms: type × key wave × hand × cue (05 §2's family-local ladder). */
+export function scaleAdmissionKey(a: ScaleAtom): number[] {
+  return [SCALE_TYPE_ORDER.indexOf(a.type), waveOf(a.key), HAND_ORDER[a.hand], a.cue === "keysig" ? 1 : 0];
+}
+
+/** Admission key for F6 atoms: basis × key wave × hand (alternating last — the T6 capstone). */
+export function arpAdmissionKey(a: ArpAtom): number[] {
+  return [ARP_BASIS_ORDER.indexOf(a.basis), waveOf(a.root), HAND_ORDER[a.hand]];
+}
+
+const FAMILY_ORDER: Record<string, number> = { chord: 0, scale: 1, arp: 2 };
+
+function admissionKey(a: DrillAtom): number[] {
+  const fam = FAMILY_ORDER[a.family] ?? 9;
+  if (a.family === "scale") return [fam, ...scaleAdmissionKey(a)];
+  if (a.family === "arp") return [fam, ...arpAdmissionKey(a)];
+  return [fam, ...chordAdmissionKey(a)];
+}
+
+export function compareAdmission(a: DrillAtom, b: DrillAtom): number {
+  const ka = admissionKey(a), kb = admissionKey(b);
+  for (let i = 0; i < Math.max(ka.length, kb.length); i++) {
+    const d = (ka[i] ?? 0) - (kb[i] ?? 0);
+    if (d !== 0) return d;
+  }
   return a.id < b.id ? -1 : 1;
+}
+
+/** The interleave identity (04 §6): what "same root / same quality" means per family. */
+export function identityOf(a: DrillAtom): { root: unknown; quality: unknown } {
+  if (a.family === "scale") return { root: a.key, quality: a.type };
+  if (a.family === "arp") return { root: a.root, quality: a.basis };
+  return { root: a.root, quality: a.quality };
 }
 
 /** Hands-only subsumption (02 §3): the RH/LH siblings an HT play-atom subsumes. */
@@ -87,6 +141,19 @@ export function chordSymbol(a: ChordAtom): string {
   const inv = a.inversion ?? 0;
   if (!inv) return base;
   return `${base}/${PC_NAMES[chordPcs(a)[0]]}`;
+}
+
+const SCALE_LABEL: Record<ScaleType, string> = {
+  major: "major", minorNatural: "natural minor", minorHarmonic: "harmonic minor",
+  minorMelodic: "melodic minor", chromatic: "chromatic",
+};
+const ARP_LABEL: Record<string, string> = { maj: "major", min: "minor", dom7: "dominant 7th", dim7: "diminished 7th" };
+
+/** The prompt title, per family — plain words, never model nouns (hub rule). */
+export function atomTitle(a: DrillAtom): string {
+  if (a.family === "scale") return `${PC_NAMES[a.key]} ${SCALE_LABEL[a.type]}`;
+  if (a.family === "arp") return `${PC_NAMES[a.root]} ${ARP_LABEL[a.basis]} arpeggio`;
+  return chordSymbol(a);
 }
 
 export { QUALITY_ORDER, PC_NAMES };

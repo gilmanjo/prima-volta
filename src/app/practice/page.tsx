@@ -1,50 +1,84 @@
 "use client";
-// The practice player, Phase-1 slice (U2's rulings): landscape-first, mode chip beside the
-// devchip, one-run chord symbols, no key labels, no clock — and a wrong answer STOPS THE FLOW
-// for reconciliation: expected vs played shown, continue by tap or by playing the correct answer.
+// The practice player, Phase-1 (U2's rulings): landscape-first, mode chip beside the devchip,
+// one-run chord symbols, no key labels, no clock — a wrong answer STOPS THE FLOW for
+// reconciliation, and run material (F5/F6) plays against the metronome pulse with the ruled
+// count-in (one bar ≥80, two below) and the 03 §4/§6 grid matcher + pulsed rating map.
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Keybed, type KeyState } from "../../components/Keybed";
-import { catalog, chordPcs, chordSymbol, compareAdmission, subsumedBy, type ChordAtom } from "../../core/catalog";
+import {
+  atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, subsumedBy, PC_NAMES,
+  type ArpAtom, type ChordAtom, type DrillAtom, type ScaleAtom,
+} from "../../core/catalog";
 import { next as fillerNext, noteServed, type FillerState } from "../../core/filler";
 import { gradeDiscreteChord } from "../../core/grader/discrete";
+import { gradePulsedRun, gridWindowMs } from "../../core/grader/pulsed";
+import { buildRun, type Run } from "../../core/runs";
 import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from "../../core/scheduler";
 import { ulid } from "../../core/ulid";
 import type { NoteEvent, Pc } from "../../core/types";
-import { defaultProfile, deviceName, initMidi, onNote } from "../../services/midi";
+import { CHORD_SPREAD_MS, RUN_BEAT_MS, RUN_BEATS_PER_BAR } from "../../core/constants";
+import { defaultProfile, initMidi, onNote } from "../../services/midi";
+import { startRunClock, type RunClock } from "../../services/metronome";
 import { ensureAudio, ui } from "../../services/uiAudio";
 import { appendAttempt, appendReview, loadCards, pushOutbox, saveCard } from "../../services/store";
-import { PC_NAMES } from "../../core/catalog";
-import { CHORD_SPREAD_MS } from "../../core/constants";
 
-type Phase = "init" | "teach" | "prompt" | "reconcile" | "good" | "next" | "polishing" | "unavailable";
+type Phase = "init" | "teach" | "prompt" | "countin" | "run" | "reconcile" | "good" | "next" | "polishing" | "unavailable";
 const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never bleeds in (U2)
 
-const POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
+type Family = "chord" | "scale" | "arp";
+const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios" };
+
+const CHORD_POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
   .filter(a => a.answer === "midi" && !a.stream && a.cue === "name" && a.form === "blocked")
   .sort(compareAdmission);
 
+function poolFor(f: Family): DrillAtom[] {
+  if (f === "scale") // keysig cue is engraved — staff territory, Phase 2
+    return (catalog.defaults("scale") as ScaleAtom[]).filter(a => a.cue === "name").sort(compareAdmission);
+  if (f === "arp") // alternating is the T6 capstone — its handoff grading comes later
+    return (catalog.defaults("arp") as ArpAtom[]).filter(a => a.hand !== "alternating").sort(compareAdmission);
+  return CHORD_POOL;
+}
+
+const isRunAtom = (a: DrillAtom): a is ScaleAtom | ArpAtom => a.family === "scale" || a.family === "arp";
+
 export default function Practice() {
   const [phase, setPhase] = useState<Phase>("init");
+  const [family, setFamily] = useState<Family>("chord");
   const [device, setDevice] = useState<string | null>(null);
-  const [atom, setAtom] = useState<ChordAtom | null>(null);
+  const [atom, setAtom] = useState<DrillAtom | null>(null);
   const [keys, setKeys] = useState<Record<number, KeyState>>({});
   const [feedback, setFeedback] = useState<string>("");
+  const [beat, setBeat] = useState<{ b: number; cIn: boolean } | null>(null);
 
   const S = useRef<{
-    filler: FillerState; served: number; boutId: string; profileId: string | null;
+    filler: FillerState; pool: DrillAtom[]; served: number; boutId: string; profileId: string | null;
+    profileLatencyMs: number; profileJitterMs: number;
     card: DrillCard | null; promptAt: number; collected: NoteEvent[]; matched: Set<number>;
     reconcileMatched: Set<number>; sinceSync: number; finalized: boolean; retryTimer: number | null;
     reconcileArmedAt: number; reconcileBuf: { midi: number; onMs: number }[];
-  }>({ filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, served: 0, boutId: ulid(), profileId: null, card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(), sinceSync: 0, finalized: false, retryTimer: null, reconcileArmedAt: 0, reconcileBuf: [] });
+    run: Run | null; runClock: RunClock | null; runT0: number; finalizeTimer: number | null;
+    teachSlot: number; teachHit: Set<number>;
+  }>({
+    filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, pool: CHORD_POOL, served: 0,
+    boutId: ulid(), profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
+    card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(),
+    sinceSync: 0, finalized: false, retryTimer: null, reconcileArmedAt: 0, reconcileBuf: [],
+    run: null, runClock: null, runT0: 0, finalizeTimer: null, teachSlot: 0, teachHit: new Set(),
+  });
 
   const phaseRef = useRef<Phase>("init");
-  const atomRef = useRef<ChordAtom | null>(null);
+  const atomRef = useRef<DrillAtom | null>(null);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { atomRef.current = atom; }, [atom]);
 
-  const expectedKeyStates = useCallback((a: ChordAtom, state: KeyState): Record<number, KeyState> => {
+  const expectedKeyStates = useCallback((a: DrillAtom, state: KeyState): Record<number, KeyState> => {
     const out: Record<number, KeyState> = {};
+    if (isRunAtom(a)) {
+      for (const m of buildRun(a).pathMidis) out[m] = state;
+      return out;
+    }
     const stack = (base: number) => {
       let prev = base - 1;
       for (const pc of chordPcs(a)) {          // bass-first voicing: the inversion is the lesson
@@ -58,12 +92,20 @@ export default function Practice() {
     return out;
   }, []);
 
+  const clearRunTimers = useCallback(() => {
+    const st = S.current;
+    if (st.runClock) { st.runClock.stop(); st.runClock = null; }
+    if (st.finalizeTimer !== null) { clearTimeout(st.finalizeTimer); st.finalizeTimer = null; }
+    setBeat(null);
+  }, []);
+
   const serve = useCallback(() => {
     const st = S.current;
     if (st.retryTimer !== null) { clearTimeout(st.retryTimer); st.retryTimer = null; }
+    clearRunTimers();
     setKeys({}); // the board always clears between items (log #74's stale-green report)
     st.finalized = false;
-    const res = fillerNext({ pool: POOL }, st.filler, { servedCount: st.served, nowMs: Date.now() });
+    const res = fillerNext({ pool: st.pool }, st.filler, { servedCount: st.served, nowMs: Date.now() });
     if (res.kind === "polishing" || res.kind === "unavailable") {
       setPhase(res.kind);
       st.retryTimer = window.setTimeout(serve, 4000); // never a dead screen — quietly check again
@@ -76,23 +118,56 @@ export default function Practice() {
     st.collected = []; st.matched = new Set(); st.reconcileMatched = new Set();
     setAtom(res.atom);
     setFeedback("");
+    if (isRunAtom(res.atom)) {
+      st.run = buildRun(res.atom);
+      if (res.kind === "teach") {
+        st.teachSlot = 0; st.teachHit = new Set();
+        setKeys(expectedKeyStates(res.atom, "exp"));
+        setPhase("teach");
+      } else {
+        const a = res.atom;
+        const clock = startRunClock({
+          beatMs: RUN_BEAT_MS, runBeats: st.run.slots.length,
+          onBeat: (b, cIn) => { setBeat({ b, cIn }); if (!cIn && phaseRef.current === "countin") setPhase("run"); },
+        });
+        st.runClock = clock; st.runT0 = clock.t0Ms;
+        st.finalizeTimer = window.setTimeout(
+          () => finalizeRun(a),
+          clock.endMs - performance.now() + Math.max(RUN_BEAT_MS / 2, 250) + 300,
+        );
+        setPhase("countin");
+      }
+      return;
+    }
+    st.run = null;
     if (res.kind === "teach") {
       setKeys(expectedKeyStates(res.atom, "exp"));
       setPhase("teach");
     } else {
       setPhase("prompt");
     }
-  }, [expectedKeyStates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expectedKeyStates, clearRunTimers]);
 
   /** The between-items beat (U2): the prompt fades out, a breath with the serve tick, the next
    *  fades in — so the next prompt reads as NEW even when it differs only by hand. */
   const advance = useCallback((delayMs = 0) => {
     setTimeout(() => {
-      setPhase("next"); setKeys({}); // atom stays mounted so the outgoing prompt can fade
+      setPhase("next"); setKeys({}); setBeat(null); // atom stays mounted so the outgoing prompt can fade
       ui.tick();
       setTimeout(serve, 380);
     }, delayMs);
   }, [serve]);
+
+  const logAttempt = useCallback((a: DrillAtom, attemptId: string, nowMs: number, gradeJson: Record<string, unknown>) => {
+    const st = S.current;
+    void appendAttempt({
+      id: attemptId, kind: "drill", atomId: a.id, mode: "rehearsal", profileId: st.profileId,
+      rawMidi: st.collected, graderVersion: "v1", tagsVersion: "v1", gradeJson,
+      startedAt: Math.round(nowMs - (performance.now() - st.promptAt)), boutId: st.boutId,
+    });
+    if (++st.sinceSync >= 8) { st.sinceSync = 0; void pushOutbox(); }
+  }, []);
 
   const finalize = useCallback(async (a: ChordAtom) => {
     const st = S.current;
@@ -113,11 +188,8 @@ export default function Practice() {
     const { card: after, row } = applyRep(card, graded.primary, attemptId, ctx);
     st.filler.cards.set(a.id, after);
     void saveCard(after);
-    void appendAttempt({
-      id: attemptId, kind: "drill", atomId: a.id, mode: "rehearsal", profileId: st.profileId,
-      rawMidi: st.collected, graderVersion: "v1", tagsVersion: "v1",
-      gradeJson: { rating: graded.primary.rating, latencyMs: graded.primary.latencyMs, errors: graded.primary.errorEvents.length },
-      startedAt: Math.round(nowMs - (performance.now() - st.promptAt)), boutId: st.boutId,
+    logAttempt(a, attemptId, nowMs, {
+      rating: graded.primary.rating, latencyMs: graded.primary.latencyMs, errors: graded.primary.errorEvents.length,
     });
     void appendReview({ id: ulid(), ...row });
     for (const [subId, er] of graded.embedded) {
@@ -126,15 +198,79 @@ export default function Practice() {
       const out = applyDerived(subCard, er, attemptId, ulid(), ctx);
       if (out) { st.filler.cards.set(subId, out.card); void saveCard(out.card); void appendReview({ id: ulid(), ...out.row }); }
     }
-    if (++st.sinceSync >= 8) { st.sinceSync = 0; void pushOutbox(); }
     return graded.primary;
-  }, []);
+  }, [logAttempt]);
+
+  const finalizeRun = useCallback((a: ScaleAtom | ArpAtom) => {
+    const st = S.current;
+    if (st.finalized) return;
+    st.finalized = true;
+    clearRunTimers();
+    const run = st.run!;
+    // the raw stream is what gets logged; the profile latency applies only at judgment (03 §3)
+    const adjusted = st.collected.map(n => ({ ...n, onMs: n.onMs - st.profileLatencyMs }));
+    const { result, evennessCv, outOfWindow } = gradePulsedRun({
+      slots: run.slots, t0Ms: st.runT0, beatMs: RUN_BEAT_MS,
+      windowMs: gridWindowMs(RUN_BEAT_MS, st.profileJitterMs), promptAtMs: st.runT0,
+    }, adjusted);
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    const { card: after, row } = applyRep(st.card!, result, attemptId, { servedCount: st.served, nowMs });
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs, {
+      rating: result.rating, latencyMs: result.latencyMs, errors: result.errorEvents.length,
+      outOfWindow, evennessCv,
+    });
+    void appendReview({ id: ulid(), ...row });
+    if (result.rating === 1) {
+      ui.err();
+      const errKeys: Record<number, KeyState> = {};
+      for (const e of result.errorEvents) if (e.playedMidi !== undefined) errKeys[e.playedMidi] = "err";
+      setKeys({ ...expectedKeyStates(a, "exp"), ...errKeys });
+      setFeedback(`Expected ${atomTitle(a)}`);
+      setPhase("reconcile");
+      return;
+    }
+    if (result.rating === 3) ui.good(); else ui.hard();
+    setFeedback(`${atomTitle(a)} · ${result.rating === 3 ? "Good" : "Hard"}`);
+    setPhase("good");
+    advance(850);
+  }, [advance, clearRunTimers, expectedKeyStates, logAttempt]);
 
   const handleNote = useCallback((n: { midi: number; onMs: number; vel: number }) => {
     const a = atomRef.current;
     const st = S.current;
     const ph = phaseRef.current;
     if (!a) return;
+
+    if (isRunAtom(a)) {
+      if (ph === "teach") {
+        const run = st.run!;
+        const slot = run.slots[st.teachSlot];
+        if (!slot) return;
+        if (slot.midis.includes(n.midi) && !st.teachHit.has(n.midi)) {
+          st.teachHit.add(n.midi);
+          setKeys(k => ({ ...k, [n.midi]: "ok" }));
+          if (st.teachHit.size >= slot.midis.length) {
+            st.teachSlot++; st.teachHit = new Set();
+            if (st.teachSlot >= run.slots.length) {
+              const taught = afterTeach(st.card!);
+              st.filler.cards.set(a.id, taught);
+              void saveCard(taught);
+              advance(300);
+            }
+          }
+        }
+        return;
+      }
+      if (ph === "countin" || ph === "run") {
+        st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
+        setKeys(k => ({ ...k, [n.midi]: st.run!.pathMidis.includes(n.midi) ? "ok" : "err" }));
+      }
+      return; // run reconcile continues by tap only (U2 v0)
+    }
+
     const pc = ((n.midi % 12) + 12) % 12 as Pc;
     const want = new Set(chordPcs(a));
     const need = a.hand === "HT" ? want.size * 2 : want.size;
@@ -212,6 +348,10 @@ export default function Practice() {
     ensureAudio();
     const arm = () => ensureAudio();
     document.addEventListener("pointerdown", arm);
+    const f = new URLSearchParams(window.location.search).get("family");
+    const fam: Family = f === "scale" || f === "arp" ? f : "chord";
+    S.current.pool = poolFor(fam);
+    setFamily(fam);
     (async () => {
       const cards = await loadCards();
       if (!alive) return;
@@ -220,7 +360,12 @@ export default function Practice() {
       // forever, so race it — if access arrives later, the device chip lights then.
       const midiInit = initMidi(name => {
         setDevice(name);
-        if (name) S.current.profileId = defaultProfile(name).id;
+        if (name) {
+          const p = defaultProfile(name);
+          S.current.profileId = p.id;
+          S.current.profileLatencyMs = p.latencyMs;
+          S.current.profileJitterMs = p.jitterMs;
+        }
       }).catch(() => setDevice(null));
       await Promise.race([midiInit, new Promise(res => setTimeout(res, 1500))]);
       onNote(n => handleNote(n));
@@ -228,15 +373,29 @@ export default function Practice() {
     })();
     const onHide = () => { if (document.visibilityState === "hidden") void pushOutbox(); };
     document.addEventListener("visibilitychange", onHide);
-    return () => { alive = false; onNote(null); document.removeEventListener("pointerdown", arm); document.removeEventListener("visibilitychange", onHide); void pushOutbox(); };
+    return () => {
+      alive = false; onNote(null);
+      document.removeEventListener("pointerdown", arm);
+      document.removeEventListener("visibilitychange", onHide);
+      const st = S.current;
+      if (st.retryTimer !== null) clearTimeout(st.retryTimer);
+      if (st.finalizeTimer !== null) clearTimeout(st.finalizeTimer);
+      st.runClock?.stop();
+      void pushOutbox();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const isRun = atom !== null && isRunAtom(atom);
+  const subParts = atom === null ? null
+    : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave" : "up-down"]
+    : [atom.hand as string, atom.form as string];
 
   return (
     <main className="flex h-dvh flex-col">
       <header className="flex items-center gap-2 px-4 py-2 text-[11px] uppercase tracking-wide text-[var(--ink2)]">
         <Link href="/" className="mr-1">←</Link>
-        <span>Chords</span>
+        <span>{FAMILY_TITLE[family]}</span>
         <span className="ml-auto rounded-full border border-[var(--border)] px-2 py-0.5 normal-case tracking-normal text-[var(--ink)]">
           {phase === "teach" ? "Teach" : "Rehearsal"}
         </span>
@@ -253,22 +412,32 @@ export default function Practice() {
             <span className="ml-2 text-[var(--accent-hi)]">check again</span>
           </button>
         )}
-        {(phase === "teach" || phase === "prompt" || phase === "reconcile" || phase === "good" || phase === "next") && atom && (
+        {(phase === "teach" || phase === "prompt" || phase === "countin" || phase === "run" || phase === "reconcile" || phase === "good" || phase === "next") && atom && (
           <div className={`flex w-full items-end justify-between gap-6 transition-opacity duration-200 ease-out ${phase === "next" ? "opacity-0" : "opacity-100"}`}>
             <div>
-              <div className="font-serif text-6xl leading-none">{chordSymbol(atom)}</div>
+              <div className="font-serif text-6xl leading-none">{atomTitle(atom)}</div>
               <div className="mt-2 text-[16px]">
-                <span className="text-[var(--ink)]">{atom.hand as string}</span>
-                <span className="text-[var(--ink2)]"> · {atom.form as string}</span>
+                <span className="text-[var(--ink)]">{subParts![0]}</span>
+                <span className="text-[var(--ink2)]"> · {subParts![1]}</span>
               </div>
             </div>
-            <div className="max-w-[52%] text-right">
-              {phase === "teach" && <p className="text-[14px] text-[var(--ink2)]">Ungraded — take your time</p>}
+            <div className="flex max-w-[52%] flex-col items-end gap-2 text-right">
+              {isRun && (phase === "countin" || phase === "run") && (
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: RUN_BEATS_PER_BAR }, (_, i) => (
+                    <i key={i} className={`inline-block h-2 w-2 rounded-full ${beat && beat.b === i ? (beat.cIn ? "bg-[var(--ink2)]" : "bg-[var(--accent-hi)]") : "bg-[var(--border)]"}`} />
+                  ))}
+                  <span className="ml-1 text-[12px] text-[var(--ink2)]">♩={Math.round(60000 / RUN_BEAT_MS)}</span>
+                </div>
+              )}
+              {phase === "teach" && <p className="text-[14px] text-[var(--ink2)]">{isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}</p>}
               {phase === "good" && <p className="text-[14px] text-[var(--good)]">{feedback}</p>}
               {phase === "reconcile" && (
                 <button onClick={() => advance(0)} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-left text-[14px] leading-relaxed text-[var(--ink)]">
                   <span className="text-[var(--felt)]">{feedback}</span>
-                  <span className="mt-1 block text-[13px] text-[var(--ink2)]">Play it together — or tap to continue</span>
+                  <span className="mt-1 block text-[13px] text-[var(--ink2)]">
+                    {isRun ? "Tap to continue" : "Play it together — or tap to continue"}
+                  </span>
                 </button>
               )}
             </div>

@@ -30,7 +30,7 @@
 
 | Tier | Content | Anchor |
 |---|---|---|
-| T1 | 1 octave up-down, HS, triads | The F4-bridge tier; gentle tempo |
+| T1 | 1 octave up-down, HS, triads | The F4-bridge tier; gentle tempo (v0: ♩=60, one note per beat, 4/4 frame) |
 | T2 | 2 octaves HS, triads | RCM mid-level pacing |
 | T3 | 2 octaves HT, triads | |
 | T4 | dom7 / dim7, HS then HT | |

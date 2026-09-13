@@ -32,7 +32,7 @@
 
 | Tier | Content | Anchor |
 |---|---|---|
-| T1 | 1 octave, HS | Gentle tempo; doubles as teach state (path shown on first encounter per key) |
+| T1 | 1 octave, HS | Gentle tempo (v0: ♩=60, one note per beat, 4/4 frame); doubles as teach state (path shown on first encounter per key) |
 | T2 | 2 octaves, HS | |
 | T3 | 2 octaves, HT parallel | Adds the hand-alignment stat (onset delta per degree, as F6 T3) |
 | T4 | Tempo gates, HS | ♪=80 (v0 anchor, tunable) |
