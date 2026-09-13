@@ -13,33 +13,53 @@ const WHEEL_SIGS = [0, 1, 2, 3, 4, 5, 6, -5, -4, -3, -2, -1];
 // Count order, sharps then flats (F1 §Variants): ♮ · 1–6♯ · 1–5♭ (G♭ rides its toggle)
 const GRID_SIGS = [0, 1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5];
 
+// The wheel geometry, straight from the ratified mockup (_kbd.js keywheel): a segmented
+// annulus — twelve 30° wedges with small gaps, labels at mid-radius, accidental-count
+// sublabels, the mode named at the hub. One scaling SVG: always a circle, any orientation.
+const C = 130, R1 = 66, R2 = 122, RL = (R1 + R2) / 2 + 3;
+const pt = (r: number, aDeg: number): [number, number] => {
+  const a = ((aDeg - 90) * Math.PI) / 180;
+  return [C + r * Math.cos(a), C + r * Math.sin(a)];
+};
+const wedgePath = (i: number): string => {
+  const a0 = i * 30 - 15 + 1.4, a1 = i * 30 + 15 - 1.4;
+  const [x0o, y0o] = pt(R2, a0), [x1o, y1o] = pt(R2, a1);
+  const [x0i, y0i] = pt(R1, a0), [x1i, y1i] = pt(R1, a1);
+  return `M ${x0o} ${y0o} A ${R2} ${R2} 0 0 1 ${x1o} ${y1o} L ${x1i} ${y1i} A ${R1} ${R1} 0 0 0 ${x0i} ${y0i} Z`;
+};
+const sigSub = (sig: number): string => (sig === 0 ? "" : sig > 0 ? `${sig}♯` : `${-sig}♭`);
+
 export const KeyWheel = memo(function KeyWheel({
   mode, states = {}, onPick,
 }: { mode: "major" | "minor"; states?: Record<number, PickState>; onPick: (sig: number) => void }) {
   return (
-    // the wheel is a square fit to the SMALLER container dimension (portrait clipped it, log #83);
-    // the parent widget zone declares container-type: size
-    <div className="flex h-full w-full items-center justify-center">
-      <div className="relative" style={{ width: "min(96cqw, 96cqh)", height: "min(96cqw, 96cqh)" }}>
-        {WHEEL_SIGS.map((sig, i) => {
-          const th = (i / 12) * 2 * Math.PI;
-          const st = states[sig];
-          return (
-            <button key={sig} onClick={() => onPick(sig)}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-3 py-1.5 text-[15px] leading-none ${
-                st === "correct" ? "border-[var(--good)] bg-[var(--good)] text-white"
-                : st === "wrong" ? "border-[var(--felt)] text-[var(--felt)]"
-                : "border-[var(--border)] bg-[var(--panel)] text-[var(--ink)]"}`}
-              style={{ left: `${50 + 42 * Math.sin(th)}%`, top: `${50 - 42 * Math.cos(th)}%` }}>
+    <svg viewBox="0 0 260 260" className="mx-auto block h-full w-full">
+      {WHEEL_SIGS.map((sig, i) => {
+        const st = states[sig];
+        const [lx, ly] = pt(RL, i * 30);
+        return (
+          <g key={sig} onClick={() => onPick(sig)} className="cursor-pointer">
+            <path d={wedgePath(i)}
+              fill={st === "correct" ? "rgba(88,181,115,0.18)" : st === "wrong" ? "rgba(178,58,51,0.14)" : "var(--panel2)"}
+              stroke={st === "correct" ? "var(--good)" : st === "wrong" ? "var(--felt)" : "var(--border)"}
+              strokeWidth={st ? 1.6 : 1} />
+            <text x={lx} y={ly + (mode === "major" ? 1 : 4)} textAnchor="middle" pointerEvents="none"
+              fill={st === "wrong" ? "var(--felt)" : "var(--ink)"}
+              fontSize={mode === "major" ? 14 : 12}
+              fontWeight={mode === "major" ? 700 : 500}
+              fontStyle={mode === "major" ? "normal" : "italic"}>
               {keyNameOf(sig, mode).replace(` ${mode}`, "")}
-            </button>
-          );
-        })}
-        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[12px] uppercase tracking-wide text-[var(--muted)]">
-          {mode}
-        </span>
-      </div>
-    </div>
+            </text>
+            {mode === "major" && sigSub(sig) && (
+              <text x={lx} y={ly + 15} textAnchor="middle" pointerEvents="none"
+                fill="var(--muted)" fontSize={8.5}>{sigSub(sig)}</text>
+            )}
+          </g>
+        );
+      })}
+      <text x={C} y={C + 4} textAnchor="middle" fill="var(--muted)" fontSize={11}
+        style={{ textTransform: "uppercase", letterSpacing: "0.08em" }}>{mode}</text>
+    </svg>
   );
 });
 
