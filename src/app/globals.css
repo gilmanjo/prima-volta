@@ -1,1 +1,22 @@
 @import "tailwindcss";
+
+/* Design v2 tokens (11 §Design language): ebony + slate, flat and withholding. */
+:root {
+  --bg: #0e1218;
+  --panel: #141a22;
+  --panel2: #1a212b;
+  --ink: #e8eaee;
+  --ink2: #9aa3b0;
+  --muted: #6e7684;
+  --accent: #5b7fa6;
+  --accent-hi: #82a6cb;
+  --felt: #b23a33;
+  --good: #58b573;
+  --paper: #f4efe4;
+  --border: rgba(255, 255, 255, 0.09);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
