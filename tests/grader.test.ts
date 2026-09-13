@@ -29,8 +29,20 @@ describe("discrete grader (03 §4/§6/§7)", () => {
     expect(g.primary.latencyMs).toBe(730); // completion still measured
   });
 
-  it("doubling an expected pitch class is never an error (name-cue = pitch classes, 03 §7)", () => {
+  it("an extra key on an already-sounded pc is an insertion — the drill asks for the chord once per hand (log #74)", () => {
     const g = gradeDiscreteChord(spec(), [n(48, 900), n(60, 905), n(64, 920), n(67, 940)]); // doubled C
+    expect(g.primary.rating).toBe(1);
+    expect(g.primary.errorEvents.some(e => e.type === "insertion")).toBe(true);
+  });
+
+  it("playing hands-together cannot pass a single-hand atom (six notes ≠ three)", () => {
+    const both = [n(48, 900), n(52, 905), n(55, 910), n(60, 950), n(64, 960), n(67, 970)];
+    const g = gradeDiscreteChord(spec({ hand: "RH" }), both);
+    expect(g.primary.rating).toBe(1);
+  });
+
+  it("same-key retriggers (device chatter) fold to one note", () => {
+    const g = gradeDiscreteChord(spec(), [n(60, 900), n(60, 902), n(64, 920), n(67, 940)]);
     expect(g.primary.rating).toBe(3);
   });
 
@@ -57,9 +69,26 @@ describe("discrete grader (03 §4/§6/§7)", () => {
     expect(g.primary.rating).toBe(3);
   });
 
-  it("HT: hands split at the largest gap; embedded results judge each hand on its own window (02 §3)", () => {
+  it("the slash bass is graded: right tones over the wrong bass = an inversion error (Jordan's C/G report)", () => {
+    const secondInv: Pc[] = [7, 0, 4]; // C/G — bass first
+    const wrong = gradeDiscreteChord(spec({ pcs: secondInv, inversion: 2 }), [n(60, 900), n(64, 910), n(67, 920)]); // played root position
+    expect(wrong.primary.rating).toBe(1);
+    expect(wrong.primary.errorEvents.some(e => e.tags.includes("inversion:2"))).toBe(true);
+    const right = gradeDiscreteChord(spec({ pcs: secondInv, inversion: 2 }), [n(55, 900), n(60, 910), n(64, 920)]); // G below
+    expect(right.primary.rating).toBe(3);
+  });
+
+  it("HT close-position chords an octave apart split correctly (score-based, not largest-gap)", () => {
+    const cg = [n(43, 900), n(48, 905), n(52, 910), n(55, 950), n(60, 960), n(64, 970)]; // C/G in both hands
+    const split = splitHands(cg, [7, 0, 4]);
+    expect(split.LH.map(x => x.midi)).toEqual([43, 48, 52]);
+    const g = gradeDiscreteChord(spec({ pcs: [7, 0, 4], hand: "HT", inversion: 2 }), cg);
+    expect(g.primary.rating).toBe(3);
+  });
+
+  it("HT: embedded results judge each hand on its own window (02 §3)", () => {
     const notes = [n(48, 900), n(52, 905), n(55, 910), n(72, 950), n(76, 960), n(79, 1000)];
-    expect(splitHands(notes).LH.length).toBe(3);
+    expect(splitHands(notes, CMAJ).LH.length).toBe(3);
     const g = gradeDiscreteChord(spec({ hand: "HT" }), notes, { LH: "lh1", RH: "rh1", embeddedWindowMs: 5000 });
     expect(g.primary.rating).toBe(3);
     expect(g.embedded.get("lh1")!.inWindow).toBe(true);

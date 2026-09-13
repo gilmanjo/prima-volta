@@ -30,8 +30,8 @@ export default function Practice() {
   const S = useRef<{
     filler: FillerState; served: number; boutId: string; profileId: string | null;
     card: DrillCard | null; promptAt: number; collected: NoteEvent[]; matched: Set<number>;
-    reconcileMatched: Set<number>; sinceSync: number;
-  }>({ filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, served: 0, boutId: ulid(), profileId: null, card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(), sinceSync: 0 });
+    reconcileMatched: Set<number>; sinceSync: number; finalized: boolean; retryTimer: number | null;
+  }>({ filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, served: 0, boutId: ulid(), profileId: null, card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(), sinceSync: 0, finalized: false, retryTimer: null });
 
   const phaseRef = useRef<Phase>("init");
   const atomRef = useRef<ChordAtom | null>(null);
@@ -40,22 +40,30 @@ export default function Practice() {
 
   const expectedKeyStates = useCallback((a: ChordAtom, state: KeyState): Record<number, KeyState> => {
     const out: Record<number, KeyState> = {};
-    const base = a.hand === "LH" ? 48 : 60;
-    let prev = -1;
-    for (const pc of chordPcs(a)) {
-      let m = base + pc;
-      while (m <= prev) m += 12;
-      out[m] = state; prev = m;
-      if (a.hand === "HT") { out[m - 12 < 45 ? m + 12 : m - 12] = state; } // second hand's copy, an octave apart
-    }
+    const stack = (base: number) => {
+      let prev = base - 1;
+      for (const pc of chordPcs(a)) {          // bass-first voicing: the inversion is the lesson
+        let m = base + ((pc - (base % 12) + 12) % 12);
+        while (m <= prev) m += 12;
+        out[m] = state; prev = m;
+      }
+    };
+    if (a.hand === "HT") { stack(48); stack(60); }
+    else stack(a.hand === "LH" ? 48 : 60);
     return out;
   }, []);
 
   const serve = useCallback(() => {
     const st = S.current;
+    if (st.retryTimer !== null) { clearTimeout(st.retryTimer); st.retryTimer = null; }
+    setKeys({}); // the board always clears between items (log #74's stale-green report)
+    st.finalized = false;
     const res = fillerNext({ pool: POOL }, st.filler, { servedCount: st.served, nowMs: Date.now() });
-    if (res.kind === "polishing") { setPhase("polishing"); return; }
-    if (res.kind === "unavailable") { setPhase("unavailable"); return; }
+    if (res.kind === "polishing" || res.kind === "unavailable") {
+      setPhase(res.kind);
+      st.retryTimer = window.setTimeout(serve, 4000); // never a dead screen — quietly check again
+      return;
+    }
     st.served++;
     noteServed(st.filler, res.atom);
     st.card = res.card;
@@ -67,7 +75,6 @@ export default function Practice() {
       setKeys(expectedKeyStates(res.atom, "exp"));
       setPhase("teach");
     } else {
-      setKeys({});
       setPhase("prompt");
     }
   }, [expectedKeyStates]);
@@ -78,7 +85,7 @@ export default function Practice() {
     const pcs = chordPcs(a);
     const subs = a.hand === "HT" ? subsumedBy(a) : [];
     const graded = gradeDiscreteChord(
-      { pcs, hand: a.hand as "RH" | "LH" | "HT", windowMs: windowFor(card), promptAtMs: st.promptAt },
+      { pcs, hand: a.hand as "RH" | "LH" | "HT", windowMs: windowFor(card), promptAtMs: st.promptAt, inversion: (a.inversion as number) ?? 0 },
       st.collected,
       a.hand === "HT" ? {
         LH: subs.find(x => x.hand === "LH")?.id, RH: subs.find(x => x.hand === "RH")?.id,
@@ -133,13 +140,14 @@ export default function Practice() {
       }
       return;
     }
-    if (ph !== "prompt") return;
+    if (ph !== "prompt" || st.finalized) return;
 
     st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
     if (want.has(pc)) {
       st.matched.add(a.hand === "HT" ? n.midi : pc);
       setKeys(k => ({ ...k, [n.midi]: "ok" }));
       if (st.matched.size >= need) {
+        st.finalized = true; // exactly one grade per serve (log #74's double-finalize)
         void finalize(a).then(res => {
           if (res.rating === 1) { enterReconcile(a, null); return; }
           setFeedback(`${chordSymbol(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
@@ -149,6 +157,7 @@ export default function Practice() {
       }
     } else {
       // wrong answer: the flow stops for reconciliation (11 global rule)
+      st.finalized = true;
       setKeys(k => ({ ...k, [n.midi]: "err" }));
       void finalize(a).then(() => enterReconcile(a, n.midi));
     }
@@ -202,11 +211,11 @@ export default function Practice() {
       </header>
 
       <section className="flex min-h-0 flex-1 items-center px-6">
-        {phase === "polishing" && (
-          <p className="mx-auto text-[15px] text-[var(--ink2)]">everything here is steady — polishing</p>
-        )}
-        {phase === "unavailable" && (
-          <p className="mx-auto text-[15px] text-[var(--ink2)]">nothing to serve here right now</p>
+        {(phase === "polishing" || phase === "unavailable") && (
+          <button onClick={serve} className="mx-auto text-[15px] text-[var(--ink2)]">
+            {phase === "polishing" ? "everything here is steady — polishing" : "nothing to serve here right now"}
+            <span className="ml-2 text-[var(--accent-hi)]">check again</span>
+          </button>
         )}
         {(phase === "teach" || phase === "prompt" || phase === "reconcile" || phase === "good") && atom && (
           <div className="flex w-full items-end justify-between gap-6">
@@ -228,7 +237,7 @@ export default function Practice() {
         {phase === "init" && <p className="mx-auto text-[14px] text-[var(--muted)]">loading…</p>}
       </section>
 
-      <section className="h-28 shrink-0 px-2 pb-2">
+      <section className="h-[44dvh] min-h-36 shrink-0 px-2 pb-2">
         <div className="h-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1">
           <Keybed states={keys} />
         </div>

@@ -114,7 +114,7 @@ Tags are computed from the score context at grading time (pure function of exerc
 | Player restarts a passage unprompted | Rehearsal: **not a tracked event** — errors already made stand (a mistake is a mistake, exactly like corrected notes), replayed material is ignored for scoring, and the attempt completes as one take; there's always the next read. Performance: attempt ends, scored as-is |
 | Enharmonic MIDI equivalence | MIDI numbers are enharmonic-blind; staff-cue items grade the number (D♯=E♭ accepted); `choice` items are where spelling knowledge is graded |
 | Octave policy | Staff-cue: exact octave, always. Name-cue: any octave, always — the cue type defines the register knowledge being tested. **Octave-qualified names** ("A♭3" — F9 streams, F3 anchors) are register cues and grade exact-octave; bare pitch-class symbols (F4 chords, F5 scales) stay any-octave |
-| Trailing extra notes after completion | Ignored within 500ms grace (release flourishes), logged beyond |
+| Trailing extra notes after completion | Ignored within the 500ms grace (release flourishes) — but notes landing inside the spread window of completion are part of the *attack* and grade normally (an extra hand is not a flourish); logged beyond the grace |
 
 ## 8. Explicitly not graded in v1
 

@@ -70,6 +70,19 @@ describe("block-filler (08 §4)", () => {
     expect((solo as { atom: ChordAtom }).atom.id).toBe(cDim.id);
   });
 
+  it("the cold-start dead zone never freezes: un-ripe step cards serve under user demand (08 §4, log #74)", () => {
+    const s = fresh();
+    // five atoms all parked in un-ripe confirm steps, trickle exhausted → must still serve
+    for (const a of pool.slice(0, 5)) {
+      let c = afterTeach(newCard(a.id, 0));
+      ({ card: c } = applyRep(c, good, "t" + a.id, { servedCount: 0, nowMs: 0 }));
+      s.cards.set(a.id, c);
+    }
+    s.admittedThisWindow = Array.from({ length: 5 }, () => ({ atMs: 1 }));
+    const r = next({ pool: pool.slice(0, 5) }, s, { servedCount: 2, nowMs: 1000 });
+    expect(r.kind).toBe("item"); // never "polishing", never frozen
+  });
+
   it("everything graduated and bright → polishing, and it says so", () => {
     const s = fresh();
     const a = pool[0];

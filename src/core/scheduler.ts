@@ -93,7 +93,8 @@ export function applyRep(
       if (res.rating === 3) confirmDue(); else againNowDue();
       break;
     case "againNow":
-      confirmDue(); // "then the confirm step" (04 §2)
+      if (res.rating === 1) againNowDue(); // another error re-queues the relearn rep —
+      else confirmDue();                   // errors never fast-track "then the confirm step" (04 §2)
       break;
     case "confirm":
       if (res.rating === 3) {

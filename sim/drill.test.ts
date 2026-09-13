@@ -105,10 +105,13 @@ describe("drill-loop personas (13 — real modules, virtual weeks)", () => {
     expect(meanR).toBeGreaterThan(0.5);
   });
 
-  it("the overreacher (drill-grade): heavy Agains churn steps instead of graduating a cohort", () => {
-    const r = run(PERSONAS.overreacher, 10, 60);
-    expect(r.againNows).toBeGreaterThan(20);
-    expect(r.graduations).toBeLessThan(run(PERSONAS.worker, 10, 60).graduations);
+  it("the overreacher (drill-grade): heavy relearn churn, never a larger graduated cohort", () => {
+    const over = run(PERSONAS.overreacher, 10, 60);
+    const work = run(PERSONAS.worker, 10, 60);
+    const unique = (r: ReturnType<typeof run>) => [...r.state.cards.values()].filter(c => c.step === "graduated").length;
+    expect(over.againNows).toBeGreaterThan(work.againNows * 3); // the churn signature
+    expect(unique(over)).toBeLessThanOrEqual(unique(work));     // errors never grow the cohort
+    // note: raw `graduations` counts RE-graduations after lapses — churn inflates it by design
   });
 
   it("the device-biased (+35 ms uniform): the generous learning window absorbs it — grading unchanged", () => {

@@ -73,6 +73,12 @@ export function next(block: BlockSpec, state: FillerState, ctx: AreaCtx): Filler
   const bright = yielding(introduced.filter(x => x.c.step === "graduated"))
     .sort((p, q) => retrievability(p.c, ctx.nowMs) - retrievability(q.c, ctx.nowMs));
   if (bright.length) return { kind: "item", atom: bright[0].a, card: bright[0].c };
+  // 4b · step timing yields under user demand (08 §4's sovereignty — the cold-start fix, log #74):
+  // when the WHOLE area is un-ripe step cards and nothing else is servable, serving them early
+  // beats a dead screen; massed reps under user demand are allowed and logged like any evidence.
+  const stepPhase = yielding(introduced.filter(x => x.c.step !== "graduated"))
+    .sort((p, q) => (p.c.stepDueItems ?? 0) - (q.c.stepDueItems ?? 0));
+  if (stepPhase.length) return { kind: "item", atom: stepPhase[0].a, card: stepPhase[0].c };
   if (introduced.length === 0 && block.pool.length === 0) return { kind: "unavailable" };
   if (introduced.length) return { kind: "polishing" };
   return { kind: "unavailable" };
