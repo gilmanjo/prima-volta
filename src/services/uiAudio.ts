@@ -26,6 +26,7 @@ export const ui = {
   good(): void { ensureAudio(); blip(660, 0, 0.08); blip(990, 0.07, 0.11); },        // clean, in window
   hard(): void { ensureAudio(); blip(660, 0, 0.11); },                               // clean, over window
   err(): void { ensureAudio(); blip(150, 0, 0.16, 0.13, "triangle"); },              // reconciliation stop
+  chime(): void { ensureAudio(); blip(880, 0, 0.14, 0.07); blip(660, 0.12, 0.22, 0.06); }, // block done (U2)
 };
 
 /** The shared context, for the metronome (a separate voice, 11's soundfont ruling). */

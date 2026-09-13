@@ -22,16 +22,17 @@ import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from ".
 import { ulid } from "../../core/ulid";
 import type { NoteEvent, Pc } from "../../core/types";
 import { CHORD_SPREAD_MS, KNOWLEDGE_WINDOW_MS, RUN_BEATS_PER_BAR } from "../../core/constants";
+import { STARTER_TEMPLATE, type PracticeTemplate, type TemplateBlock } from "../../core/template";
 import { defaultProfile, initMidi, onNote } from "../../services/midi";
 import { startRunClock, type RunClock } from "../../services/metronome";
 import { ensureAudio, ui } from "../../services/uiAudio";
-import { appendAttempt, appendReview, loadCards, pushOutbox, saveCard } from "../../services/store";
+import { appendAttempt, appendReview, attachBoutProfile, loadCards, pushOutbox, saveCard, touchBout } from "../../services/store";
 
-type Phase = "init" | "teach" | "prompt" | "countin" | "run" | "reconcile" | "good" | "next" | "polishing" | "unavailable";
+type Phase = "init" | "teach" | "prompt" | "countin" | "run" | "reconcile" | "good" | "next" | "interstitial" | "done" | "polishing" | "unavailable";
 const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never bleeds in (U2)
 
-type Family = "chord" | "scale" | "arp" | "keys";
-const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures" };
+type Family = "chord" | "scale" | "arp" | "keys" | "free";
+const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures", free: "Free roam" };
 
 const CHORD_POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
   .filter(a => a.answer === "midi" && !a.stream && a.cue === "name" && a.form === "blocked")
@@ -44,7 +45,16 @@ function poolFor(f: Family): DrillAtom[] {
     return (catalog.defaults("scale") as ScaleAtom[]).filter(a => a.cue === "name").sort(compareAdmission);
   if (f === "arp") // alternating is the T6 capstone — its handoff grading comes later
     return (catalog.defaults("arp") as ArpAtom[]).filter(a => a.hand !== "alternating").sort(compareAdmission);
+  if (f === "free") // U1's ruled free roam: the weakest-first everything-in-scope mix
+    return [...poolFor("keys"), ...CHORD_POOL, ...poolFor("scale"), ...poolFor("arp")].sort(compareAdmission);
   return CHORD_POOL;
+}
+
+/** A template block's serving pool (08 §5): its areas' pools, weakest-first via the filler. */
+function poolForBlock(b: TemplateBlock): DrillAtom[] {
+  return b.families
+    .flatMap(f => (f === "reading" ? [] : poolFor(f)))  // F10 arrives in Phase 3 — unavailable skips (08 §7)
+    .sort(compareAdmission);
 }
 
 const isRunAtom = (a: DrillAtom): a is ScaleAtom | ArpAtom => a.family === "scale" || a.family === "arp";
@@ -74,8 +84,9 @@ export default function Practice() {
   const [picks, setPicks] = useState<Record<number, PickState>>({});
 
   const S = useRef<{
-    filler: FillerState; pool: DrillAtom[]; served: number; boutId: string; profileId: string | null;
+    filler: FillerState; pool: DrillAtom[]; served: number; profileId: string | null;
     profileLatencyMs: number; profileJitterMs: number;
+    template: PracticeTemplate | null; blockIdx: number; blockStartMs: number; blockServed: number; interTimer: number | null;
     card: DrillCard | null; promptAt: number; collected: NoteEvent[]; matched: Set<number>;
     reconcileMatched: Set<number>; sinceSync: number; finalized: boolean; retryTimer: number | null;
     reconcileArmedAt: number; reconcileBuf: { midi: number; onMs: number }[];
@@ -83,7 +94,8 @@ export default function Practice() {
     teachSlot: number; teachHit: Set<number>;
   }>({
     filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, pool: CHORD_POOL, served: 0,
-    boutId: ulid(), profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
+    profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
+    template: null, blockIdx: 0, blockStartMs: 0, blockServed: 0, interTimer: null,
     card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(),
     sinceSync: 0, finalized: false, retryTimer: null, reconcileArmedAt: 0, reconcileBuf: [],
     run: null, runClock: null, runT0: 0, runNoteMs: 1000, finalizeTimer: null, teachSlot: 0, teachHit: new Set(),
@@ -125,6 +137,13 @@ export default function Practice() {
     const st = S.current;
     if (st.retryTimer !== null) { clearTimeout(st.retryTimer); st.retryTimer = null; }
     clearRunTimers();
+    // bounded blocks end at the next item boundary — soft chime + auto-advance (U2)
+    if (st.template) {
+      const b = st.template.blocks[st.blockIdx];
+      const over = (b.boundMinutes !== undefined && performance.now() - st.blockStartMs >= b.boundMinutes * 60_000)
+        || (b.boundCount !== undefined && st.blockServed >= b.boundCount);
+      if (over) { ui.chime(); enterInterstitial(st.blockIdx + 1); return; }
+    }
     setKeys({}); // the board always clears between items (log #74's stale-green report)
     st.finalized = false;
     const res = fillerNext({ pool: st.pool }, st.filler, { servedCount: st.served, nowMs: Date.now() });
@@ -134,6 +153,7 @@ export default function Practice() {
       return;
     }
     st.served++;
+    st.blockServed++;
     noteServed(st.filler, res.atom);
     st.card = res.card;
     st.promptAt = performance.now();
@@ -192,6 +212,40 @@ export default function Practice() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expectedKeyStates, clearRunTimers]);
 
+  const [blockIdxView, setBlockIdxView] = useState(0);
+
+  /** Enter the block-transition interstitial (U2): "up next", the name large, its bound,
+   *  the template dots, one placing line. Auto-advances; tappable. Empty-pool blocks skip. */
+  const enterInterstitial = useCallback((idx: number) => {
+    const st = S.current;
+    const blocks = st.template!.blocks;
+    while (idx < blocks.length && poolForBlock(blocks[idx]).length === 0) idx++;
+    if (idx >= blocks.length) {
+      ui.chime();
+      setPhase("done");
+      void pushOutbox();
+      return;
+    }
+    st.blockIdx = idx;
+    setBlockIdxView(idx);
+    setAtom(null); setKeys({}); setFeedback(""); setBeat(null);
+    setPhase("interstitial");
+    st.interTimer = window.setTimeout(beginBlock, 2600);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const beginBlock = useCallback(() => {
+    const st = S.current;
+    if (st.interTimer !== null) { clearTimeout(st.interTimer); st.interTimer = null; }
+    const block = st.template!.blocks[st.blockIdx];
+    st.pool = poolForBlock(block);
+    st.filler = { cards: st.filler.cards, recentServed: [], admittedThisWindow: [] }; // shared cards, fresh block context
+    st.blockStartMs = performance.now();
+    st.blockServed = 0;
+    serve();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** The between-items beat (U2): the prompt fades out, a breath with the serve tick, the next
    *  fades in — so the next prompt reads as NEW even when it differs only by hand. */
   const advance = useCallback((delayMs = 0) => {
@@ -204,14 +258,19 @@ export default function Practice() {
 
   const logAttempt = useCallback((a: DrillAtom, attemptId: string, nowMs: number, gradeJson: Record<string, unknown>, rawChoiceJson?: unknown) => {
     const st = S.current;
-    void appendAttempt({
-      id: attemptId, kind: "drill", atomId: a.id, mode: "rehearsal", profileId: st.profileId,
-      rawMidi: rawChoiceJson === undefined ? st.collected : [],
-      ...(rawChoiceJson !== undefined ? { rawChoiceJson } : {}),
-      graderVersion: "v1", tagsVersion: "v1", gradeJson,
-      startedAt: Math.round(nowMs - (performance.now() - st.promptAt)), boutId: st.boutId,
-    });
-    if (++st.sinceSync >= 8) { st.sinceSync = 0; void pushOutbox(); }
+    const raw = rawChoiceJson === undefined ? st.collected.slice() : [];
+    void (async () => {
+      // a graded attempt is bout activity (08 §6): continue the sitting or open a fresh bout
+      const boutId = await touchBout(st.profileId, nowMs);
+      await appendAttempt({
+        id: attemptId, kind: "drill", atomId: a.id, mode: "rehearsal", profileId: st.profileId,
+        rawMidi: raw,
+        ...(rawChoiceJson !== undefined ? { rawChoiceJson } : {}),
+        graderVersion: "v1", tagsVersion: "v1", gradeJson,
+        startedAt: Math.round(nowMs - (performance.now() - st.promptAt)), boutId,
+      });
+      if (++st.sinceSync >= 8) { st.sinceSync = 0; void pushOutbox(); }
+    })();
   }, []);
 
   const finalize = useCallback(async (a: ChordAtom) => {
@@ -447,10 +506,12 @@ export default function Practice() {
     ensureAudio();
     const arm = () => ensureAudio();
     document.addEventListener("pointerdown", arm);
-    const f = new URLSearchParams(window.location.search).get("family");
-    const fam: Family = f === "scale" || f === "arp" || f === "keys" ? f : "chord";
+    const params = new URLSearchParams(window.location.search);
+    const f = params.get("family");
+    const fam: Family = f === "scale" || f === "arp" || f === "keys" || f === "free" ? f : "chord";
     S.current.pool = poolFor(fam);
     setFamily(fam);
+    if (params.get("template") === "starter") S.current.template = STARTER_TEMPLATE;
     (async () => {
       const cards = await loadCards();
       if (!alive) return;
@@ -464,11 +525,14 @@ export default function Practice() {
           S.current.profileId = p.id;
           S.current.profileLatencyMs = p.latencyMs;
           S.current.profileJitterMs = p.jitterMs;
+          // a bout opens on device detect (08 §6); attach the profile if it opened without one
+          void touchBout(p.id, Date.now()).then(() => attachBoutProfile(p.id));
         }
       }).catch(() => setDevice(null));
       await Promise.race([midiInit, new Promise(res => setTimeout(res, 1500))]);
       onNote(n => handleNote(n));
-      serve();
+      if (S.current.template) enterInterstitial(0);
+      else serve();
     })();
     const onHide = () => { if (document.visibilityState === "hidden") void pushOutbox(); };
     document.addEventListener("visibilitychange", onHide);
@@ -479,6 +543,7 @@ export default function Practice() {
       const st = S.current;
       if (st.retryTimer !== null) clearTimeout(st.retryTimer);
       if (st.finalizeTimer !== null) clearTimeout(st.finalizeTimer);
+      if (st.interTimer !== null) clearTimeout(st.interTimer);
       st.runClock?.stop();
       void pushOutbox();
     };
@@ -487,6 +552,8 @@ export default function Practice() {
 
   const isRun = atom !== null && isRunAtom(atom);
   const isKeys = atom !== null && isKeysAtom(atom);
+  const tpl = S.current.template;
+  const tplBlock = tpl ? tpl.blocks[blockIdxView] : null;
   const subParts = atom === null ? null
     : isKeysAtom(atom) ? [`${atom.clef} clef`, atom.dir === "sigToKey" ? "name the key" : "pick the signature"]
     : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave" : "up-down"]
@@ -496,7 +563,7 @@ export default function Practice() {
     <main className="flex h-dvh flex-col">
       <header className="flex items-center gap-2 px-4 py-2 text-[11px] uppercase tracking-wide text-[var(--ink2)]">
         <Link href="/" className="mr-1">←</Link>
-        <span>{FAMILY_TITLE[family]}</span>
+        <span>{tplBlock ? tplBlock.name : FAMILY_TITLE[family]}</span>
         <span className="ml-auto rounded-full border border-[var(--border)] px-2 py-0.5 normal-case tracking-normal text-[var(--ink)]">
           {phase === "teach" ? "Teach" : "Rehearsal"}
         </span>
@@ -550,22 +617,52 @@ export default function Practice() {
             </div>
           </div>
         )}
+        {phase === "interstitial" && tpl && tplBlock && (
+          <button onClick={beginBlock} className="mx-auto text-center">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--muted)]">up next</div>
+            <div className="mt-1 font-serif text-5xl leading-tight">{tplBlock.name}</div>
+            <div className="mt-2 text-[14px] text-[var(--ink2)]">
+              {tplBlock.boundMinutes !== undefined ? `${tplBlock.boundMinutes} minutes` : `${tplBlock.boundCount} reads`} · weakest first
+            </div>
+            <div className="mt-4 flex justify-center gap-1.5">
+              {tpl.blocks.map((b, i) => (
+                <i key={b.name} className={`inline-block h-1.5 w-1.5 rounded-full ${i < blockIdxView ? "bg-[var(--ink2)]" : i === blockIdxView ? "bg-[var(--accent-hi)]" : "bg-[var(--border)]"}`} />
+              ))}
+            </div>
+            {(blockIdxView > 0 || blockIdxView + 1 < tpl.blocks.length) && (
+              <div className="mt-2 text-[13px] text-[var(--ink2)]">
+                {[blockIdxView > 0 ? `${tpl.blocks[blockIdxView - 1].name} done` : null,
+                  blockIdxView + 1 < tpl.blocks.length ? `${tpl.blocks[blockIdxView + 1].name} after` : null]
+                  .filter(Boolean).join(" · ")}
+              </div>
+            )}
+          </button>
+        )}
+        {phase === "done" && (
+          <div className="mx-auto text-center">
+            <div className="font-serif text-5xl">Session done</div>
+            <div className="mt-3 text-[14px] text-[var(--ink2)]">{S.current.served} items practiced</div>
+            <Link href="/" className="mt-5 inline-block rounded-lg bg-[var(--accent)] px-5 py-2 text-[14px] font-medium text-white">Home</Link>
+          </div>
+        )}
         {phase === "init" && <p className="mx-auto text-[14px] text-[var(--muted)]">loading…</p>}
       </section>
 
       {/* the widget roster replaces the keybed for choice answers (U2 §4);
           key proportions hold in any orientation (U2): height follows width, never toothpicks */}
-      <section className={`${family === "keys" ? "h-[56dvh]" : "h-[min(44dvh,24vw)] min-h-20"} shrink-0 px-2 pb-2`}>
-        <div className="h-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1">
-          {atom && isKeysAtom(atom) ? (
-            atom.dir === "sigToKey"
-              ? <KeyWheel mode={atom.mode} states={picks} onPick={handlePick} />
-              : <SigGrid clef={atom.clef} states={picks} onPick={handlePick} />
-          ) : family === "keys" ? null : (
-            <Keybed states={keys} labels={phase === "teach" && labels ? labels : undefined} />
-          )}
-        </div>
-      </section>
+      {phase !== "interstitial" && phase !== "done" && (
+        <section className={`${isKeys || (atom === null && family === "keys") ? "h-[56dvh]" : "h-[min(44dvh,24vw)] min-h-20"} shrink-0 px-2 pb-2`}>
+          <div className="h-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1" style={{ containerType: "size" }}>
+            {atom && isKeysAtom(atom) ? (
+              atom.dir === "sigToKey"
+                ? <KeyWheel mode={atom.mode} states={picks} onPick={handlePick} />
+                : <SigGrid clef={atom.clef} states={picks} onPick={handlePick} />
+            ) : atom === null && (family === "keys" || tpl !== null) ? null : (
+              <Keybed states={keys} labels={phase === "teach" && labels ? labels : undefined} />
+            )}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

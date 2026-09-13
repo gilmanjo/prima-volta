@@ -13,6 +13,8 @@ export const CHORD_LEARN_WINDOW_MS = 5000;
 export const CHORD_GATE_WINDOW_MS = 900;
 export const KNOWLEDGE_WINDOW_MS = 5000;   // F1 §Grading — one generous window, never tightens
 
+export const BOUT_IDLE_MS = 20 * 60_000;   // 08 §6 — the idle clock is the only closer
+
 // Practice-local steps (04 §2) — item-denominated with a clock fallback.
 export const CONFIRM_AFTER_ITEMS = 20;
 export const CONFIRM_AFTER_MS = 10 * 60_000;

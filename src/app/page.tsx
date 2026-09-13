@@ -54,9 +54,13 @@ export default function Home() {
         })}
       </div>
 
-      <Link href="/practice"
+      <Link href="/practice?template=starter"
         className="mt-8 block rounded-lg bg-[var(--accent)] py-3 text-center font-medium text-white">
         Practice
+      </Link>
+      <Link href="/practice?family=free"
+        className="mt-2 block rounded-lg border border-[var(--border)] bg-[var(--panel)] py-2.5 text-center text-[14px] text-[var(--ink)]">
+        Free roam <span className="text-[var(--ink2)]">· weakest first, everything in scope</span>
       </Link>
     </main>
   );
