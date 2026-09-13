@@ -46,7 +46,7 @@ Keys enter along the ladder's key axis (05), the same staggering F4's quality or
 
 ## Grading
 
-Rehearsal mode with metronome (scales are inherently pulsed; shares F6's machinery): note order strict against the type's degrees — a wrong note is a `substitution` tagged `scale-degree:N` + `key:X` + `scaleType`; completeness; **evenness** (IOI coefficient of variation — the crossing-quality proxy); tempo adherence at gate tiers; HT alignment from T3. Turnaround: top note once. Fingering is invisible to MIDI — evenness exposes bad crossings. Teach states will display **standard fingerings sourced from established references** (RCM/ABRSM syllabi, published charts — e.g., the B♭/E♭/A♭ major RH thumb rules) — a research task; we do not invent fingerings.
+Rehearsal mode with metronome (scales are inherently pulsed; shares F6's machinery): note order strict against the type's degrees — a wrong note is a `substitution` tagged `scale-degree:N` + `key:X` + `scaleType`; completeness; **evenness** (IOI coefficient of variation — the crossing-quality proxy); tempo adherence at gate tiers; HT alignment from T3. Turnaround: top note once. Fingering is invisible to MIDI — evenness exposes bad crossings. Teach states display **standard fingerings** on the path keys, sourced and cross-verified from published charts (the fingering data file names its sources — three agreeing on every major key, the B♭ RH tiebreak included). **The minor forms wait on print-grade sourcing** — the online charts disagree with one another on several keys — and display nothing until then: absence is legal, invention is not.
 
 ## Prescribes for
 

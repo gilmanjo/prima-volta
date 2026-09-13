@@ -45,7 +45,7 @@
 
 Rehearsal mode with metronome (arpeggios are inherently pulsed). Graded: note order (strict), completeness, **evenness** (IOI coefficient of variation — bad crossings show up here even though MIDI can't see fingers), tempo adherence at gate tiers. Turnaround ruling: top note played **once** at the apex of up-down (standard practice). Latency = prompt → first onset; total duration vs tempo gate.
 
-Fingering itself is ungradeable — evenness is the proxy. **Alternating (T6):** the handoff seam is the diagnostic — the inter-onset gap across each hand exchange is tracked and tagged `handoff`; evenness must survive the exchange. Teach states will display **standard fingerings sourced from established references** (RCM/ABRSM syllabi, published fingering charts) — a research task; we do not invent fingerings.
+Fingering itself is ungradeable — evenness is the proxy. **Alternating (T6):** the handoff seam is the diagnostic — the inter-onset gap across each hand exchange is tracked and tagged `handoff`; evenness must survive the exchange. Teach states display **standard fingerings** on the path keys — the triad pattern system and its exceptions (all-black F♯ major and E♭ minor take the white-key pattern; B♭'s deviations) sourced and cross-verified from published charts, cited in the fingering data file. **dom7/dim7 per-key charts are not yet sourced** and display nothing until they are; we do not invent fingerings.
 
 ## Prescribes for
 

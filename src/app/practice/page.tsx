@@ -12,6 +12,7 @@ import {
 } from "../../core/catalog";
 import { next as fillerNext, noteServed, type FillerState } from "../../core/filler";
 import { gradeDiscreteChord } from "../../core/grader/discrete";
+import { runLabels } from "../../core/fingering";
 import { gradePulsedRun, gridWindowMs } from "../../core/grader/pulsed";
 import { buildRun, runTempo, type Run } from "../../core/runs";
 import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from "../../core/scheduler";
@@ -52,6 +53,7 @@ export default function Practice() {
   const [feedback, setFeedback] = useState<string>("");
   const [beat, setBeat] = useState<{ b: number; cIn: boolean } | null>(null);
   const [bpm, setBpm] = useState<number>(60);
+  const [labels, setLabels] = useState<Record<number, string> | null>(null);
 
   const S = useRef<{
     filler: FillerState; pool: DrillAtom[]; served: number; boutId: string; profileId: string | null;
@@ -119,11 +121,13 @@ export default function Practice() {
     st.collected = []; st.matched = new Set(); st.reconcileMatched = new Set();
     setAtom(res.atom);
     setFeedback("");
+    setLabels(null);
     if (isRunAtom(res.atom)) {
       st.run = buildRun(res.atom);
       if (res.kind === "teach") {
         st.teachSlot = 0; st.teachHit = new Set();
         setKeys(expectedKeyStates(res.atom, "exp"));
+        setLabels(runLabels(res.atom)); // sourced fingering numerals — or nothing (U2, log #81)
         setPhase("teach");
       } else {
         const a = res.atom;
@@ -456,7 +460,7 @@ export default function Practice() {
       {/* key proportions hold in any orientation (U2): height follows width, never toothpicks */}
       <section className="h-[min(44dvh,24vw)] min-h-20 shrink-0 px-2 pb-2">
         <div className="h-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1">
-          <Keybed states={keys} />
+          <Keybed states={keys} labels={phase === "teach" && labels ? labels : undefined} />
         </div>
       </section>
     </main>

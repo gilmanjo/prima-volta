@@ -9,6 +9,7 @@ The reference shelf: browse everything the app can drill, and author how practic
 - **The eleven families** → variants & stages → drills. Per-drill row: strength pip, stage name (plain words, never T-numbers), gate progress (window-achievement dots), last-practiced.
 - The **admission frontier is visible**: unlit-outline rows labeled "up next" — the curriculum is inspectable, never a mystery (02 §7's seed ladders, rendered; the wave itself stays model-internal).
 - Row actions: **Practice now** (single-atom sovereignty, 08 §4) · a scope shortcut ("hide this / show this") deep-linking into U7's scope section.
+- **Fingering reference:** scale and arpeggio rows surface their **sourced fingering** (the same cited data the teach states draw, F5/F6 §Grading) — numerals on a mini path, per hand; rows whose fingering is not yet sourced show none.
 - Engine-C families show their generation story instead (axis positions + "start a read").
 
 ## Templates
