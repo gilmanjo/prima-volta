@@ -1,7 +1,7 @@
 // Pulsed-run laws (03 §4 windowed matcher · 03 §6 pulsed map · F5/F6 run shapes), pinned —
 // with the personas that would notice them regressing (13's feature-ships-with-its-persona law).
 import { describe, it, expect } from "vitest";
-import { buildRun } from "../src/core/runs";
+import { buildRun, runTempo } from "../src/core/runs";
 import { gradePulsedRun, gridWindowMs, type PulsedRunSpec } from "../src/core/grader/pulsed";
 import { afterTeach, applyRep, newCard } from "../src/core/scheduler";
 import type { ArpAtom, ScaleAtom } from "../src/core/catalog";
@@ -12,14 +12,14 @@ const scale = (over: Partial<ScaleAtom> = {}): ScaleAtom =>
 const arp = (over: Partial<ArpAtom> = {}): ArpAtom =>
   ({ id: "a1", family: "arp", inDefault: true, basis: "maj", root: 7, hand: "RH", start: "root", ...over }) as ArpAtom;
 
-const T0 = 10_000, BEAT = 1000, W = gridWindowMs(BEAT, 25); // 145
-const spec = (slots: PulsedRunSpec["slots"]): PulsedRunSpec =>
-  ({ slots, t0Ms: T0, beatMs: BEAT, windowMs: W, promptAtMs: T0 });
+const T0 = 10_000;
+const spec = (slots: PulsedRunSpec["slots"], noteMs = 1000): PulsedRunSpec =>
+  ({ slots, t0Ms: T0, noteMs, windowMs: gridWindowMs(noteMs, 25), promptAtMs: T0 });
 
 /** Play a run: every expected note at its grid time + its offset (per flat note index). */
-const play = (slots: PulsedRunSpec["slots"], offset: (i: number) => number): NoteEvent[] => {
+const play = (slots: PulsedRunSpec["slots"], offset: (i: number) => number, noteMs = 1000): NoteEvent[] => {
   let i = 0;
-  return slots.flatMap(s => s.midis.map(m => ({ midi: m, onMs: T0 + s.beat * BEAT + offset(i++), vel: 60 })));
+  return slots.flatMap(s => s.midis.map(m => ({ midi: m, onMs: T0 + s.beat * noteMs + offset(i++), vel: 60 })));
 };
 
 describe("run shapes (F5/F6 — up-down, apex once)", () => {
@@ -107,6 +107,29 @@ describe("the pulsed map (03 §6) — the pulse is part of the material", () => 
   });
 });
 
+describe("the gate tempo (F5/F6 anchors, ruled: ♪=80 = eighths at a ♩=80 click)", () => {
+  const slots = buildRun(scale()).slots;
+
+  it("tier demands: learning = one note per beat at ♩=60; the gate = eighths at ♩=80", () => {
+    expect(runTempo(0)).toEqual({ beatMs: 1000, notesPerBeat: 1, noteMs: 1000 });
+    expect(runTempo(1)).toEqual({ beatMs: 750, notesPerBeat: 2, noteMs: 375 });
+  });
+
+  it("W scales with the note interval: ±70ms at the gate (145 at learning tempo)", () => {
+    expect(gridWindowMs(1000, 25)).toBe(145);
+    expect(gridWindowMs(375, 25)).toBeCloseTo(70, 5);
+  });
+
+  it("an entrained run at the gate tempo passes; the same ±100ms sloppiness that survives learning fails it", () => {
+    const gate = runTempo(1).noteMs;
+    const tight = gradePulsedRun(spec(slots, gate), play(slots, i => (i % 2 ? 40 : -40), gate));
+    expect(tight.result.rating).toBe(3); // ±40ms — inside the rig's entrained spread, inside W
+    const sloppy = gradePulsedRun(spec(slots, gate), play(slots, i => (i % 3 === 0 ? 100 : 0), gate));
+    expect(sloppy.result.rating).toBe(1); // 100ms late on several onsets: out at the gate, fine at ♩=60
+    expect(sloppy.result.errorEvents.every(e => e.type === "late")).toBe(true);
+  });
+});
+
 describe("pulsed personas (13 §law) — real grader + real steps", () => {
   const slots = buildRun(scale()).slots;
   const good = (jitter: (i: number) => number) => gradePulsedRun(spec(slots), play(slots, jitter)).result;
@@ -123,10 +146,11 @@ describe("pulsed personas (13 §law) — real grader + real steps", () => {
   let seed = 42;
   const rng = () => { seed = (seed * 1664525 + 1013904223) % 2 ** 32; return seed / 2 ** 32; };
 
-  it("the steady worker (±40ms) rates Good and graduates", () => {
+  it("the steady worker (±40ms) rates Good, graduates, and earns the tempo gate", () => {
     const { c, ratings } = drive(() => Math.round(rng() * 80 - 40), 6);
     expect(ratings.every(r => r === 3)).toBe(true);
     expect(c.step).toBe("graduated");
+    expect(c.tier).toBe(1); // 3 graduated in-window reps — the next serve demands eighths at ♩=80
   });
 
   it("the rusher (every onset 180ms early) never earns a Good and never graduates", () => {

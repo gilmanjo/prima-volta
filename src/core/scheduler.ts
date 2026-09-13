@@ -29,7 +29,7 @@ export interface DrillCard {
   stepDueItems: number | null;  // area servedCount threshold (item-denominated, 04 §2)
   stepDueMs: number | null;     // the clock fallback
   fsrs: FsrsCard | null;        // null until graduation — steps live outside FSRS (04 §2)
-  tier: 0 | 1;                  // F4 v1: 0 = learning window · 1 = the T5 fluency gate
+  tier: 0 | 1;                  // v1: 0 = learning · 1 = the fluency gate (F4: the 900ms window; F5/F6: the T4 anchor tempo, eighths at ♩=80)
   gateStreak: number;           // signed: + consecutive in-window · − consecutive out (02 §1, #67)
   introducedAt: number;
   lastReviewAt: number | null;

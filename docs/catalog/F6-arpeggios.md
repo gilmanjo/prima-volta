@@ -37,6 +37,8 @@
 | T5 | 3–4 octaves + speed gates | RCM anchor ♪=80+ |
 | T6 | **Alternating hands** — LH and RH leapfrog octave by octave | The capstone; the handoff seam is the graded skill |
 
+**Anchor notation:** as F5's — ♪=N means notes as eighths against a quarter-note click at ♩=N, two per beat; learning tiers play one note per beat.
+
 ## Grading defaults
 
 Rehearsal mode with metronome (arpeggios are inherently pulsed). Graded: note order (strict), completeness, **evenness** (IOI coefficient of variation — bad crossings show up here even though MIDI can't see fingers), tempo adherence at gate tiers. Turnaround ruling: top note played **once** at the apex of up-down (standard practice). Latency = prompt → first onset; total duration vs tempo gate.

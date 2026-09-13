@@ -13,11 +13,11 @@ import {
 import { next as fillerNext, noteServed, type FillerState } from "../../core/filler";
 import { gradeDiscreteChord } from "../../core/grader/discrete";
 import { gradePulsedRun, gridWindowMs } from "../../core/grader/pulsed";
-import { buildRun, type Run } from "../../core/runs";
+import { buildRun, runTempo, type Run } from "../../core/runs";
 import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from "../../core/scheduler";
 import { ulid } from "../../core/ulid";
 import type { NoteEvent, Pc } from "../../core/types";
-import { CHORD_SPREAD_MS, RUN_BEAT_MS, RUN_BEATS_PER_BAR } from "../../core/constants";
+import { CHORD_SPREAD_MS, RUN_BEATS_PER_BAR } from "../../core/constants";
 import { defaultProfile, initMidi, onNote } from "../../services/midi";
 import { startRunClock, type RunClock } from "../../services/metronome";
 import { ensureAudio, ui } from "../../services/uiAudio";
@@ -51,6 +51,7 @@ export default function Practice() {
   const [keys, setKeys] = useState<Record<number, KeyState>>({});
   const [feedback, setFeedback] = useState<string>("");
   const [beat, setBeat] = useState<{ b: number; cIn: boolean } | null>(null);
+  const [bpm, setBpm] = useState<number>(60);
 
   const S = useRef<{
     filler: FillerState; pool: DrillAtom[]; served: number; boutId: string; profileId: string | null;
@@ -58,14 +59,14 @@ export default function Practice() {
     card: DrillCard | null; promptAt: number; collected: NoteEvent[]; matched: Set<number>;
     reconcileMatched: Set<number>; sinceSync: number; finalized: boolean; retryTimer: number | null;
     reconcileArmedAt: number; reconcileBuf: { midi: number; onMs: number }[];
-    run: Run | null; runClock: RunClock | null; runT0: number; finalizeTimer: number | null;
+    run: Run | null; runClock: RunClock | null; runT0: number; runNoteMs: number; finalizeTimer: number | null;
     teachSlot: number; teachHit: Set<number>;
   }>({
     filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, pool: CHORD_POOL, served: 0,
     boutId: ulid(), profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
     card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(),
     sinceSync: 0, finalized: false, retryTimer: null, reconcileArmedAt: 0, reconcileBuf: [],
-    run: null, runClock: null, runT0: 0, finalizeTimer: null, teachSlot: 0, teachHit: new Set(),
+    run: null, runClock: null, runT0: 0, runNoteMs: 1000, finalizeTimer: null, teachSlot: 0, teachHit: new Set(),
   });
 
   const phaseRef = useRef<Phase>("init");
@@ -126,14 +127,20 @@ export default function Practice() {
         setPhase("teach");
       } else {
         const a = res.atom;
+        // the card's tier sets the demand (F5/F6 anchors, ruled): learning = ♩=60 on the beat;
+        // the gate = eighths at ♩=80 — the metronome always clicks the quarter
+        const tempo = runTempo(res.card.tier);
+        st.runNoteMs = tempo.noteMs;
+        setBpm(Math.round(60000 / tempo.beatMs));
+        const lastNoteOffset = (st.run.slots.length - 1) * tempo.noteMs;
         const clock = startRunClock({
-          beatMs: RUN_BEAT_MS, runBeats: st.run.slots.length,
+          beatMs: tempo.beatMs, runBeats: Math.floor(lastNoteOffset / tempo.beatMs) + 1,
           onBeat: (b, cIn) => { setBeat({ b, cIn }); if (!cIn && phaseRef.current === "countin") setPhase("run"); },
         });
         st.runClock = clock; st.runT0 = clock.t0Ms;
         st.finalizeTimer = window.setTimeout(
           () => finalizeRun(a),
-          clock.endMs - performance.now() + Math.max(RUN_BEAT_MS / 2, 250) + 300,
+          clock.t0Ms + lastNoteOffset - performance.now() + Math.max(tempo.noteMs / 2, 250) + 300,
         );
         setPhase("countin");
       }
@@ -210,8 +217,8 @@ export default function Practice() {
     // the raw stream is what gets logged; the profile latency applies only at judgment (03 §3)
     const adjusted = st.collected.map(n => ({ ...n, onMs: n.onMs - st.profileLatencyMs }));
     const { result, evennessCv, outOfWindow } = gradePulsedRun({
-      slots: run.slots, t0Ms: st.runT0, beatMs: RUN_BEAT_MS,
-      windowMs: gridWindowMs(RUN_BEAT_MS, st.profileJitterMs), promptAtMs: st.runT0,
+      slots: run.slots, t0Ms: st.runT0, noteMs: st.runNoteMs,
+      windowMs: gridWindowMs(st.runNoteMs, st.profileJitterMs), promptAtMs: st.runT0,
     }, adjusted);
     const attemptId = ulid();
     const nowMs = Date.now();
@@ -427,7 +434,7 @@ export default function Practice() {
                   {Array.from({ length: RUN_BEATS_PER_BAR }, (_, i) => (
                     <i key={i} className={`inline-block h-2 w-2 rounded-full ${beat && beat.b === i ? (beat.cIn ? "bg-[var(--ink2)]" : "bg-[var(--accent-hi)]") : "bg-[var(--border)]"}`} />
                   ))}
-                  <span className="ml-1 text-[12px] text-[var(--ink2)]">♩={Math.round(60000 / RUN_BEAT_MS)}</span>
+                  <span className="ml-1 text-[12px] text-[var(--ink2)]">♩={bpm}</span>
                 </div>
               )}
               {phase === "teach" && <p className="text-[14px] text-[var(--ink2)]">{isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}</p>}

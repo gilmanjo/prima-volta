@@ -28,6 +28,10 @@ export const INTERLEAVE_RUN = 3;           // 04 §6 — never 3 consecutive sha
 // Pulsed runs (F5/F6 T1 v0: ♩=60, one note per beat, 4/4 frame).
 export const RUN_BEAT_MS = 1000;           // F5/F6 tier tables — the v0 learning tempo
 export const RUN_BEATS_PER_BAR = 4;
+// The gate anchor (F5 T4 "♪=80", ruled): notes as EIGHTHS against a quarter click at ♩=80 —
+// two per beat, ~160 notes/min. The metronome always clicks the quarter.
+export const RUN_GATE_BEAT_MS = 750;
+export const RUN_GATE_NOTES_PER_BEAT = 2;
 export const GRID_W_BASE_MS = 120;         // 03 §4 — grid window W at ♩=60-equivalent, tempo-scaled
 export const ASSOC_MIN_MS = 250;           // 03 §4 — association floor (±half a beat, min 250ms)
 export const COUNT_IN_ONE_BAR_BPM = 80;    // U2 §3 — one bar of count-in at ♩≥80, two below

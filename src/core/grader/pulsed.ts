@@ -11,8 +11,8 @@ import type { RunSlot } from "../runs";
 
 export interface PulsedRunSpec {
   slots: RunSlot[];
-  t0Ms: number;      // clock time of beat 0 (set by the count-in)
-  beatMs: number;
+  t0Ms: number;      // clock time of slot 0 (set by the count-in)
+  noteMs: number;    // the grid pitch: expected inter-onset interval (beat ÷ notes-per-beat)
   windowMs: number;  // the grid window W, tempo-scaled + jitter-widened (gridWindowMs)
   promptAtMs: number;
 }
@@ -23,17 +23,18 @@ export interface PulsedOutcome {
   outOfWindow: number;
 }
 
-/** 03 §4: W = 120ms at ♩=60-equivalent, scaled by tempo, widened by device jitter. */
-export function gridWindowMs(beatMs: number, jitterMs: number): number {
-  return GRID_W_BASE_MS * (beatMs / 1000) + jitterMs;
+/** 03 §4: W = 120ms at ♩=60-equivalent, scaled by tempo — proportional to the expected
+ *  inter-onset interval — widened by device jitter. */
+export function gridWindowMs(noteMs: number, jitterMs: number): number {
+  return GRID_W_BASE_MS * (noteMs / 1000) + jitterMs;
 }
 
 interface Slot { midi: number; tMs: number; matched: NoteEvent | null; resolved: boolean; }
 
 export function gradePulsedRun(spec: PulsedRunSpec, notesIn: NoteEvent[]): PulsedOutcome {
-  const assocMs = Math.max(spec.beatMs / 2, ASSOC_MIN_MS);
+  const assocMs = Math.max(spec.noteMs / 2, ASSOC_MIN_MS);
   const expected: Slot[] = spec.slots.flatMap(s =>
-    s.midis.map(midi => ({ midi, tMs: spec.t0Ms + s.beat * spec.beatMs, matched: null, resolved: false })));
+    s.midis.map(midi => ({ midi, tMs: spec.t0Ms + s.beat * spec.noteMs, matched: null, resolved: false })));
   const endMs = expected.length ? expected[expected.length - 1].tMs : spec.t0Ms;
   // notes before the first beat's association reach were count-in fidgets, not the run
   const played = notesIn
