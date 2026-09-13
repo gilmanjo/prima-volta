@@ -38,9 +38,9 @@
 | Tier | Content |
 |---|---|
 | T1 | Root position, blocked, HS |
-| T2 | Inversions, blocked, HS |
-| T3 | HT — same inversion both hands (mixed/contrary voicings: parked) |
-| T4 | Broken forms (up, down, up-down, down-up; in position) |
+| T2 | Broken forms, root position, HS (up, down, up-down, down-up; in position) |
+| T3 | Inversions, blocked, HS — then broken inversions (a stacked modification admits after its singles) |
+| T4 | HT — same inversion both hands (mixed/contrary voicings: parked). **Every hands-separate form precedes any HT** — the hand axis is the heaviest modification |
 | T5 | Fluency gates |
 | T6 | Random-inversion streams ("A♭/E♭ → A♭ → A♭/C" as one timed item — cycling inversions of one chord; its own atom shape, 02 §2) |
 

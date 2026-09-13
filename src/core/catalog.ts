@@ -52,20 +52,19 @@ const KEY_WAVE_PCS: Pc[][] = [[0], [7, 5], [2], [10], [9, 3], [4, 8], [11, 1], [
 const waveOf = (pc: Pc) => KEY_WAVE_PCS.findIndex(w => w.includes(pc));
 
 /** Sortable admission key for F4 play/knowledge atoms (lower = admits earlier).
- *  The nesting (05 §2, log #79): difficulty tier is the SLOWEST axis — every quality × key
- *  admits at root-position HS before the first inversion opens anywhere; within a tier,
- *  quality order × the key wave; hands-separate siblings walk adjacently per key. */
+ *  The nesting (05 §2, logs #79/#80): difficulty is the SLOWEST axis, and modifications
+ *  compose by severity — broken (+1) < inversions (+2) < HT (+4, the heaviest: every
+ *  hands-separate form precedes any hands-together). Within a stage: quality order ×
+ *  the key wave; hands-separate siblings walk adjacently per key. */
 export function chordAdmissionKey(a: ChordAtom): number[] {
   const q = QUALITY_ORDER.indexOf(a.quality);
   const w = waveOf(a.root);
-  // Tier order (F4): T1 root blocked HS → T2 inversions → T3 HT → T4 broken → (T5 gate, in-card) → T6 streams.
-  // Knowledge variants are tierless flat atoms admitting on the same quality × wave (log #52).
+  // Stages (F4 ladder): 1 root blocked HS · 2 broken · 3 inversions · 4 broken inversions ·
+  // 5+ HT forms · 9 streams. Knowledge = tierless flat atoms, riding once root play exists (log #52).
   const tier =
-    a.stream ? 6 :
-    a.answer !== "midi" ? 2.5 :             // knowledge rides alongside, after root-position play exists
-    a.form === "broken" ? 4 :
-    a.hand === "HT" ? 3 :
-    (a.inversion ?? 0) > 0 ? 2 : 1;
+    a.stream ? 9 :
+    a.answer !== "midi" ? 1.5 :
+    1 + (a.form === "broken" ? 1 : 0) + ((a.inversion ?? 0) > 0 ? 2 : 0) + (a.hand === "HT" ? 4 : 0);
   const hand = a.hand === "RH" ? 0 : a.hand === "LH" ? 1 : 2;
   const cue = a.cue === "staff" ? 1 : 0;
   return [tier, q, a.inversion ?? 0, w, cue, hand];
@@ -82,12 +81,13 @@ export function scaleAdmissionKey(a: ScaleAtom): number[] {
   return [stage, SCALE_TYPE_ORDER.indexOf(a.type), waveOf(a.key), HAND_ORDER[a.hand], a.cue === "keysig" ? 1 : 0];
 }
 
-/** Admission key for F6 atoms — the ladder's own stage order, each sweeping the full wave
- *  (F6 §Admission nesting): triads HS → triads HT → sevenths HS → sevenths HT → alternating. */
+/** Admission key for F6 atoms — the ladder's stages, each sweeping the full wave
+ *  (F6 §Admission nesting, log #80): triads HS → sevenths HS → triads HT → sevenths HT →
+ *  alternating. Every hands-separate stage precedes any hands-together. */
 export function arpAdmissionKey(a: ArpAtom): number[] {
   const basisIdx = ARP_BASIS_ORDER.indexOf(a.basis);
   const seventh = basisIdx >= 2 ? 1 : 0;
-  const stage = a.hand === "alternating" ? 4 : seventh * 2 + (a.hand === "HT" ? 1 : 0);
+  const stage = a.hand === "alternating" ? 4 : (a.hand === "HT" ? 2 : 0) + seventh;
   return [stage, basisIdx, waveOf(a.root), HAND_ORDER[a.hand]];
 }
 

@@ -25,9 +25,11 @@ describe("chords — every key at root-position HS before any difficulty modific
   it("every quality's root admits before the first inversion anywhere (dim7 root < maj inversion)", () => {
     before(chord({ quality: "dim7" }), chord({ inversion: 1 }));
   });
-  it("the tier order itself holds: inversions < HT < broken for the same chord", () => {
-    before(chord({ inversion: 2 }), chord({ hand: "HT" }));
-    before(chord({ hand: "HT" }), chord({ form: "broken" }));
+  it("the stage order (log #80): broken < inversions < HT; stacked mods after their singles", () => {
+    before(chord({ root: 11 }), chord({ form: "broken" }));                    // all roots before broken
+    before(chord({ form: "broken", root: 6 }), chord({ inversion: 1 }));       // all broken before inversions
+    before(chord({ inversion: 2, root: 6 }), chord({ inversion: 1, form: "broken" })); // singles before stacks
+    before(chord({ inversion: 1, form: "broken", root: 6 }), chord({ hand: "HT" }));   // every HS form before any HT
   });
   it("hands-separate siblings walk adjacently per key: C-RH < C-LH < G-RH", () => {
     before(chord({}), chord({ hand: "LH" }));
@@ -45,12 +47,13 @@ describe("scales — the hand axis is the slowest (HT never follows HS of the sa
   });
 });
 
-describe("arpeggios — the F6 ladder's stages, each sweeping the wave", () => {
-  it("the last minor-triad HS key admits before the first triad HT", () => {
-    before(arp({ basis: "min", root: 6 }), arp({ hand: "HT" }));
+describe("arpeggios — the F6 ladder's stages, each sweeping the wave (log #80)", () => {
+  it("sevenths HS admit before any triad HT — hands-together is the heavier modification", () => {
+    before(arp({ basis: "min", root: 6 }), arp({ basis: "dom7" }));  // triads HS sweep first
+    before(arp({ basis: "dim7", root: 6 }), arp({ hand: "HT" }));    // ALL HS before the first HT
   });
-  it("triads HT before sevenths HS; alternating dead last", () => {
-    before(arp({ basis: "min", hand: "HT", root: 6 }), arp({ basis: "dom7" }));
+  it("triads HT before sevenths HT; alternating dead last", () => {
+    before(arp({ hand: "HT", root: 6 }), arp({ basis: "dom7", hand: "HT" }));
     before(arp({ basis: "dim7", hand: "HT", root: 6 }), arp({ hand: "alternating" }));
   });
 });

@@ -32,14 +32,14 @@
 |---|---|---|
 | T1 | 1 octave up-down, HS, triads | The F4-bridge tier; gentle tempo (v0: ♩=60, one note per beat, 4/4 frame) |
 | T2 | 2 octaves HS, triads | RCM mid-level pacing |
-| T3 | 2 octaves HT, triads | |
-| T4 | dom7 / dim7, HS then HT | |
+| T3 | dom7 / dim7, HS | The four-tone geometry — still hands separate |
+| T4 | HT — triads, then sevenths | Adds the hand-alignment stat |
 | T5 | 3–4 octaves + speed gates | RCM anchor ♪=80+ |
 | T6 | **Alternating hands** — LH and RH leapfrog octave by octave | The capstone; the handoff seam is the graded skill |
 
 **Anchor notation:** as F5's — ♪=N means notes as eighths against a quarter-note click at ♩=N, two per beat; learning tiers play one note per beat.
 
-**Admission nesting (05 §2):** the ladder's stages are the slow axis, each sweeping the full key wave before the next opens — triads HS (maj then min, all keys) → triads HT (all keys) → sevenths HS → sevenths HT → alternating last.
+**Admission nesting (05 §2):** the ladder's stages are the slow axis, each sweeping the full key wave before the next opens — triads HS (maj then min, all keys) → **sevenths HS** (new geometry before the heavier hand modification) → triads HT → sevenths HT → alternating last. Every hands-separate stage precedes any hands-together.
 
 ## Grading defaults
 
