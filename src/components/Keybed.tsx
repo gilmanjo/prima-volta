@@ -10,8 +10,12 @@ const BLACK = new Set([1, 3, 6, 8, 10]);
 const FILL: Record<KeyState, string> = { ok: "var(--good)", exp: "var(--accent-hi)", err: "var(--felt)" };
 
 export const Keybed = memo(function Keybed({
-  from = 45, to = 84, states = {}, labels,
-}: { from?: number; to?: number; states?: Record<number, KeyState>; labels?: Record<number, string> }) {
+  from = 45, to = 84, states = {}, labels, onKeyTap,
+}: {
+  from?: number; to?: number; states?: Record<number, KeyState>; labels?: Record<number, string>;
+  /** When set, keys are tappable — the F4 spell variant's answer surface (F4 §Variants). */
+  onKeyTap?: (midi: number) => void;
+}) {
   const whites: number[] = [];
   for (let m = from; m <= to; m++) if (!BLACK.has(m % 12)) whites.push(m);
   const W = 100 / whites.length;
@@ -41,11 +45,15 @@ export const Keybed = memo(function Keybed({
         {whites.map((m, i) => (
           <rect key={m} x={i * W + 0.06} y={0} width={W - 0.12} height={15} rx={0.35}
             fill={states[m] ? FILL[states[m]] : "#e9e6dd"} stroke="#0e1218" strokeWidth={0.12}
-            opacity={states[m] ? 0.95 : 1} />
+            opacity={states[m] ? 0.95 : 1}
+            onClick={onKeyTap ? () => onKeyTap(m) : undefined}
+            className={onKeyTap ? "cursor-pointer" : undefined} />
         ))}
         {blacks.map(({ m, x }) => (
           <rect key={m} x={x} y={0} width={W * 0.64} height={9.2} rx={0.3}
-            fill={states[m] ? FILL[states[m]] : "#161a20"} stroke="#0a0d12" strokeWidth={0.1} />
+            fill={states[m] ? FILL[states[m]] : "#161a20"} stroke="#0a0d12" strokeWidth={0.1}
+            onClick={onKeyTap ? () => onKeyTap(m) : undefined}
+            className={onKeyTap ? "cursor-pointer" : undefined} />
         ))}
       </svg>
       {labelSpans.map(s => (

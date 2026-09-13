@@ -14,8 +14,10 @@ const WHEEL_SIGS = [0, 1, 2, 3, 4, 5, 6, -5, -4, -3, -2, -1];
 const GRID_SIGS = [0, 1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5];
 
 // The wheel geometry, straight from the ratified mockup (_kbd.js keywheel): a segmented
-// annulus — twelve 30° wedges with small gaps, labels at mid-radius, accidental-count
-// sublabels, the mode named at the hub. One scaling SVG: always a circle, any orientation.
+// annulus — twelve 30° wedges with small gaps, labels at mid-radius, the mode named at
+// the hub. KEY NAMES ONLY — no accidental-count sublabels (F1 §Variants, log #86: a count
+// label lets the answer be counted off the engraving instead of recalled).
+// One scaling SVG: always a circle, any orientation.
 const C = 130, R1 = 66, R2 = 122, RL = (R1 + R2) / 2 + 3;
 const pt = (r: number, aDeg: number): [number, number] => {
   const a = ((aDeg - 90) * Math.PI) / 180;
@@ -27,8 +29,6 @@ const wedgePath = (i: number): string => {
   const [x0i, y0i] = pt(R1, a0), [x1i, y1i] = pt(R1, a1);
   return `M ${x0o} ${y0o} A ${R2} ${R2} 0 0 1 ${x1o} ${y1o} L ${x1i} ${y1i} A ${R1} ${R1} 0 0 0 ${x0i} ${y0i} Z`;
 };
-const sigSub = (sig: number): string => (sig === 0 ? "" : sig > 0 ? `${sig}♯` : `${-sig}♭`);
-
 export const KeyWheel = memo(function KeyWheel({
   mode, states = {}, onPick,
 }: { mode: "major" | "minor"; states?: Record<number, PickState>; onPick: (sig: number) => void }) {
@@ -43,17 +43,13 @@ export const KeyWheel = memo(function KeyWheel({
               fill={st === "correct" ? "rgba(88,181,115,0.18)" : st === "wrong" ? "rgba(178,58,51,0.14)" : "var(--panel2)"}
               stroke={st === "correct" ? "var(--good)" : st === "wrong" ? "var(--felt)" : "var(--border)"}
               strokeWidth={st ? 1.6 : 1} />
-            <text x={lx} y={ly + (mode === "major" ? 1 : 4)} textAnchor="middle" pointerEvents="none"
+            <text x={lx} y={ly + 5} textAnchor="middle" pointerEvents="none"
               fill={st === "wrong" ? "var(--felt)" : "var(--ink)"}
-              fontSize={mode === "major" ? 14 : 12}
+              fontSize={mode === "major" ? 15 : 13}
               fontWeight={mode === "major" ? 700 : 500}
               fontStyle={mode === "major" ? "normal" : "italic"}>
               {keyNameOf(sig, mode).replace(` ${mode}`, "")}
             </text>
-            {mode === "major" && sigSub(sig) && (
-              <text x={lx} y={ly + 15} textAnchor="middle" pointerEvents="none"
-                fill="var(--muted)" fontSize={8.5}>{sigSub(sig)}</text>
-            )}
           </g>
         );
       })}

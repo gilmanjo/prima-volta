@@ -66,6 +66,30 @@ export async function appendReview(r: ReviewRow & { id: string }): Promise<void>
 
 import type { DeviceProfile } from "./midi";
 
+/** New-device boot (10 §5, online once): pull the review stream, refold cards client-side.
+ *  Runs only when the local replica is empty; pulled rows land WITHOUT outbox entries. */
+export async function pullReplica(
+  refold: (rows: import("../core/refold").RefoldRow[]) => Map<string, DrillCard>,
+): Promise<number> {
+  try {
+    const res = await fetch("/api/pull");
+    if (!res.ok) return 0;
+    const body = (await res.json()) as {
+      reviews: (import("../core/refold").RefoldRow & { id: string; tier: number })[];
+      profiles: (DeviceProfile & { calibratedAt?: number | null })[];
+    };
+    if (!body.reviews.length) return 0;
+    for (const r of body.reviews) await store.put("reviews", r.id, r);
+    for (const p of body.profiles ?? []) await store.put("profiles", p.id, p);
+    const cards = refold(body.reviews);
+    for (const c of cards.values()) await store.put("cards", c.atomId, c);
+    await store.put("meta", "pulledAt", Date.now());
+    return body.reviews.length;
+  } catch {
+    return 0; // offline new-device boot is out of scope by design (10 §5)
+  }
+}
+
 /** A measured device profile (03 §3): saved locally and synced — config, never history. */
 export async function saveProfile(p: DeviceProfile & { calibratedAt: number }): Promise<void> {
   await store.put("profiles", p.id, p);

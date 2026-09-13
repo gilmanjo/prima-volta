@@ -23,7 +23,7 @@ Atom space: 13 signatures × 2 directions × 2 modes × 2 clefs = **104 flat ato
 
 | Variant | Prompt → answer |
 |---|---|
-| `sig→key` | Signature engraved (treble or bass) → tap the key on the **KeyPicker** wheel, which shows **only the prompted mode's ring** — a full-size ring of majors or of minors, never both before the answer (the other ring would be a free hint). The relative pairing is revealed with the confirmation |
+| `sig→key` | Signature engraved (treble or bass) → tap the key on the **KeyPicker** wheel, which shows **only the prompted mode's ring** — a full-size ring of majors or of minors, never both before the answer (the other ring would be a free hint). The wheel carries **key names only — never accidental counts**: a count label would let the answer be counted off the engraving instead of recalled. The relative pairing is revealed with the confirmation |
 | `key→sig` | Key name (major or minor) → tap the signature on the **SignaturePicker**: a grid of twelve engraved mini-signatures (thirteen with G♭ in scope) rendered in the item's clef, ordered by accidental count (sharps, then flats) — visual glyph matching builds signature memory, which count-style answers wouldn't. Confirmation spells the accidentals in order |
 
 **Widget principle** (adopted here, proposed everywhere): full option space, never sampled distractors. The KeyPicker's radial major/minor alignment quietly teaches relative pairs; the SignaturePicker grid *is* a signatures reference chart you answer on.
