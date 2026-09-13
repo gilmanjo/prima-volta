@@ -157,9 +157,13 @@ export function stepRipe(card: DrillCard, ctx: AreaCtx): boolean {
       || (card.stepDueMs !== null && ctx.nowMs >= card.stepDueMs); // items OR clock (04 §2)
 }
 
-export interface ServedIdentity { root?: unknown; quality?: unknown; }
+export interface ServedIdentity { id?: string; root?: unknown; quality?: unknown; }
 
 export function interleaveOk(recent: ServedIdentity[], candidate: ServedIdentity): boolean {
+  // never the same item twice in a row (04 §6) — a relearn step's "a few items later"
+  // means OTHER items; like every constraint, it yields when nothing else can serve
+  const last = recent[recent.length - 1];
+  if (last?.id !== undefined && candidate.id !== undefined && last.id === candidate.id) return false;
   const lastTwo = recent.slice(-(INTERLEAVE_RUN - 1));
   if (lastTwo.length < INTERLEAVE_RUN - 1) return true;
   const allSameRoot = lastTwo.every(r => r.root !== undefined && r.root === candidate.root);

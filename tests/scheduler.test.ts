@@ -141,4 +141,9 @@ describe("serving exports (04 §6)", () => {
     const recQ = [{ root: 2, quality: "m7" }, { root: 9, quality: "m7" }];
     expect(interleaveOk(recQ, { root: 4, quality: "m7" })).toBe(false); // third same quality
   });
+
+  it("interleave: never the same ITEM twice in a row (04 §6, log #88)", () => {
+    expect(interleaveOk([{ id: "a1", root: 0, quality: "maj" }], { id: "a1", root: 0, quality: "maj" })).toBe(false);
+    expect(interleaveOk([{ id: "a1", root: 0, quality: "maj" }], { id: "a2", root: 0, quality: "min" })).toBe(true);
+  });
 });

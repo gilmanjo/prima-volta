@@ -70,6 +70,24 @@ describe("block-filler (08 §4)", () => {
     expect((solo as { atom: ChordAtom }).atom.id).toBe(cDim.id);
   });
 
+  it("the same item never serves twice in a row while anything else can (04 §6, log #88)", () => {
+    const s = fresh();
+    const a0 = pool[0], a1 = pool[1];
+    // a0 sits in a perpetually-ripe againNow (the boomerang shape from Jordan's report)
+    let c0 = afterTeach(newCard(a0.id, 0));
+    ({ card: c0 } = applyRep(c0, { ...good, rating: 1, clean: false, inWindow: false }, "t", { servedCount: 0, nowMs: 0 }));
+    s.cards.set(a0.id, c0);
+    s.cards.set(a1.id, afterTeach(newCard(a1.id, 0)));
+    const first = next({ pool: [a0, a1], appetite: "off" }, s, { servedCount: 10, nowMs: 300_000 });
+    expect((first as { atom: ChordAtom }).atom.id).toBe(a0.id); // the ripe step serves…
+    noteServed(s, (first as { atom: ChordAtom }).atom);
+    const second = next({ pool: [a0, a1], appetite: "off" }, s, { servedCount: 11, nowMs: 300_001 });
+    expect((second as { atom: ChordAtom }).atom.id).toBe(a1.id); // …but never back-to-back
+    // and the constraint yields when it is truly the only card (sovereignty)
+    const solo = next({ pool: [a0], appetite: "off" }, s, { servedCount: 11, nowMs: 300_001 });
+    expect((solo as { atom: ChordAtom }).atom.id).toBe(a0.id);
+  });
+
   it("the cold-start dead zone never freezes: un-ripe step cards serve under user demand (08 §4, log #74)", () => {
     const s = fresh();
     // five atoms all parked in un-ripe confirm steps, trickle exhausted → must still serve

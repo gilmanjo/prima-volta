@@ -329,6 +329,7 @@ export default function Practice() {
     void appendReview({ id: ulid(), ...row });
     if (result.rating === 1) {
       ui.err();
+      st.teachSlot = 0; st.teachHit = new Set(); // the remediation walk starts from the bottom
       const base = { ...expectedKeyStates(a, "exp"), ...(wrongMidi !== undefined ? { [wrongMidi]: "err" as KeyState } : {}) };
       st.baseKeys = base;
       setKeys(base);
@@ -520,8 +521,22 @@ export default function Practice() {
         ui.err();
         setKeys(k => ({ ...k, [n.midi]: "err" }));
         finalizeRun(a, n.midi);
+        return;
       }
-      return; // run reconcile continues by tap only (U2 v0)
+      if (ph === "reconcile") {
+        // remediation = walk the lit path from the top, self-paced and ungraded (U2, log #88)
+        const run = st.run!;
+        const slot = run.slots[st.teachSlot];
+        if (!slot || !slot.midis.includes(n.midi) || st.teachHit.has(n.midi)) return;
+        st.teachHit.add(n.midi);
+        setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        if (st.teachHit.size >= slot.midis.length) {
+          st.teachSlot++;
+          st.teachHit = new Set();
+          if (st.teachSlot >= run.slots.length) { ui.good(); advance(250); }
+        }
+      }
+      return;
     }
 
     const pc = ((n.midi % 12) + 12) % 12 as Pc;
@@ -734,7 +749,8 @@ export default function Practice() {
                   <span className="mt-1 block text-[13px] text-[var(--ink2)]">
                     {isKeys ? "Tap the right one — or tap here to continue"
                       : isSpell ? "Tap the tones — or tap here to continue"
-                      : isRun ? "Tap to continue" : "Play it together — or tap to continue"}
+                      : isRun ? "Walk it from the bottom — or tap here to continue"
+                      : "Play it together — or tap to continue"}
                   </span>
                 </button>
               )}
