@@ -150,4 +150,12 @@ describe("simultaneity — sequential entry never passes, in ANY order", () => {
     const g = gradeDiscreteChord(spec({ pcs: CG, hand: "HT", inversion: 2 }), together);
     expect(g.primary.rating).toBe(3);
   });
+
+  it("the spread window widens by the profile's jitter (03 §3/§4) — Jordan's HT-inversion report", () => {
+    const slightlyRolled = [n(43, 1000), n(48, 1010), n(52, 1022), n(55, 1055), n(60, 1075), n(64, 1095)]; // 95ms span
+    const base = gradeDiscreteChord(spec({ pcs: CG, hand: "HT", inversion: 2 }), slightlyRolled);
+    expect(base.primary.rating).toBe(1); // beyond the bare 80ms base…
+    const widened = gradeDiscreteChord(spec({ pcs: CG, hand: "HT", inversion: 2, spreadMs: 105 }), slightlyRolled);
+    expect(widened.primary.rating).toBe(3); // …inside base + measured jitter
+  });
 });

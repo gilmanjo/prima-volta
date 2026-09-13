@@ -16,20 +16,18 @@ import { gradeChoice, gradeSpellTaps } from "../../core/grader/choice";
 import { next as fillerNext, noteServed, type FillerState } from "../../core/filler";
 import { gradeDiscreteChord } from "../../core/grader/discrete";
 import { runLabels } from "../../core/fingering";
-import { gradePulsedRun, gridWindowMs } from "../../core/grader/pulsed";
-import { buildRun, runTempo, type Run } from "../../core/runs";
+import { buildRun, runTempo, selfPacedRunResult, type Run } from "../../core/runs";
 import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from "../../core/scheduler";
 import { ulid } from "../../core/ulid";
-import type { NoteEvent, Pc } from "../../core/types";
-import { CHORD_SPREAD_MS, KNOWLEDGE_WINDOW_MS, RUN_BEATS_PER_BAR } from "../../core/constants";
+import type { GradeResult, NoteEvent, Pc } from "../../core/types";
+import { CHORD_SPREAD_MS, KNOWLEDGE_WINDOW_MS } from "../../core/constants";
 import { STARTER_TEMPLATE, type PracticeTemplate, type TemplateBlock } from "../../core/template";
-import { defaultProfile, initMidi, onNote } from "../../services/midi";
-import { startRunClock, type RunClock } from "../../services/metronome";
+import { defaultProfile, initMidi, onNote, onNoteOff } from "../../services/midi";
 import { ensureAudio, ui } from "../../services/uiAudio";
 import { refoldCards } from "../../core/refold";
 import { appendAttempt, appendReview, attachBoutProfile, loadCards, loadProfile, pullReplica, pushOutbox, saveCard, touchBout } from "../../services/store";
 
-type Phase = "init" | "teach" | "prompt" | "countin" | "run" | "reconcile" | "good" | "next" | "interstitial" | "done" | "polishing" | "unavailable";
+type Phase = "init" | "teach" | "prompt" | "reconcile" | "good" | "next" | "interstitial" | "done" | "polishing" | "unavailable";
 const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never bleeds in (U2)
 
 type Family = "chord" | "scale" | "arp" | "keys" | "free";
@@ -81,8 +79,6 @@ export default function Practice() {
   const [atom, setAtom] = useState<DrillAtom | null>(null);
   const [keys, setKeys] = useState<Record<number, KeyState>>({});
   const [feedback, setFeedback] = useState<string>("");
-  const [beat, setBeat] = useState<{ b: number; cIn: boolean } | null>(null);
-  const [bpm, setBpm] = useState<number>(60);
   const [labels, setLabels] = useState<Record<number, string> | null>(null);
   const [picks, setPicks] = useState<Record<number, PickState>>({});
 
@@ -94,15 +90,15 @@ export default function Practice() {
     reconcileMatched: Set<number>; sinceSync: number; finalized: boolean; retryTimer: number | null;
     reconcileArmedAt: number; reconcileBuf: { midi: number; onMs: number }[];
     spellTaps: { midi: number; atMs: number }[];
-    run: Run | null; runClock: RunClock | null; runT0: number; runNoteMs: number; finalizeTimer: number | null;
-    teachSlot: number; teachHit: Set<number>;
+    run: Run | null; runNoteMs: number; runPos: number; runSlotHit: Set<number>; runOnsets: number[];
+    teachSlot: number; teachHit: Set<number>; baseKeys: Record<number, KeyState>;
   }>({
     filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, pool: CHORD_POOL, served: 0,
     profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
     template: null, blockIdx: 0, blockStartMs: 0, blockServed: 0, interTimer: null,
     card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(),
     sinceSync: 0, finalized: false, retryTimer: null, reconcileArmedAt: 0, reconcileBuf: [], spellTaps: [],
-    run: null, runClock: null, runT0: 0, runNoteMs: 1000, finalizeTimer: null, teachSlot: 0, teachHit: new Set(),
+    run: null, runNoteMs: 1000, runPos: 0, runSlotHit: new Set(), runOnsets: [], teachSlot: 0, teachHit: new Set(), baseKeys: {},
   });
 
   const phaseRef = useRef<Phase>("init");
@@ -130,17 +126,9 @@ export default function Practice() {
     return out;
   }, []);
 
-  const clearRunTimers = useCallback(() => {
-    const st = S.current;
-    if (st.runClock) { st.runClock.stop(); st.runClock = null; }
-    if (st.finalizeTimer !== null) { clearTimeout(st.finalizeTimer); st.finalizeTimer = null; }
-    setBeat(null);
-  }, []);
-
   const serve = useCallback(() => {
     const st = S.current;
     if (st.retryTimer !== null) { clearTimeout(st.retryTimer); st.retryTimer = null; }
-    clearRunTimers();
     // bounded blocks end at the next item boundary — soft chime + auto-advance (U2)
     if (st.template) {
       const b = st.template.blocks[st.blockIdx];
@@ -148,7 +136,8 @@ export default function Practice() {
         || (b.boundCount !== undefined && st.blockServed >= b.boundCount);
       if (over) { ui.chime(); enterInterstitial(st.blockIdx + 1); return; }
     }
-    setKeys({}); // the board always clears between items (log #74's stale-green report)
+    setKeys({});
+    st.baseKeys = {}; // the board always clears between items (log #74's stale-green report)
     st.finalized = false;
     const res = fillerNext({ pool: st.pool }, st.filler, { servedCount: st.served, nowMs: Date.now() });
     if (res.kind === "polishing" || res.kind === "unavailable") {
@@ -182,27 +171,17 @@ export default function Practice() {
       st.run = buildRun(res.atom);
       if (res.kind === "teach") {
         st.teachSlot = 0; st.teachHit = new Set();
-        setKeys(expectedKeyStates(res.atom, "exp"));
+        const base = expectedKeyStates(res.atom, "exp");
+        st.baseKeys = base;
+        setKeys(base);
         setLabels(runLabels(res.atom)); // sourced fingering numerals — or nothing (U2, log #81)
         setPhase("teach");
       } else {
-        const a = res.atom;
-        // the card's tier sets the demand (F5/F6 anchors, ruled): learning = ♩=60 on the beat;
-        // the gate = eighths at ♩=80 — the metronome always clicks the quarter
-        const tempo = runTempo(res.card.tier);
-        st.runNoteMs = tempo.noteMs;
-        setBpm(Math.round(60000 / tempo.beatMs));
-        const lastNoteOffset = (st.run.slots.length - 1) * tempo.noteMs;
-        const clock = startRunClock({
-          beatMs: tempo.beatMs, runBeats: Math.floor(lastNoteOffset / tempo.beatMs) + 1,
-          onBeat: (b, cIn) => { setBeat({ b, cIn }); if (!cIn && phaseRef.current === "countin") setPhase("run"); },
-        });
-        st.runClock = clock; st.runT0 = clock.t0Ms;
-        st.finalizeTimer = window.setTimeout(
-          () => finalizeRun(a),
-          clock.t0Ms + lastNoteOffset - performance.now() + Math.max(tempo.noteMs / 2, 250) + 300,
-        );
-        setPhase("countin");
+        // name-cue runs are SELF-PACED (03 §6, log #87): the tier anchor demands pace,
+        // not entrainment — the pulse arrives with cue types that can engrave a note value
+        st.runNoteMs = runTempo(res.card.tier).noteMs;
+        st.runPos = 0; st.runSlotHit = new Set(); st.runOnsets = [];
+        setPhase("prompt");
       }
       return;
     }
@@ -210,7 +189,9 @@ export default function Practice() {
     if (isSpellAtom(res.atom)) {
       st.spellTaps = [];
       if (res.kind === "teach") {
-        setKeys(expectedKeyStates(res.atom, "exp"));
+        const base = expectedKeyStates(res.atom, "exp");
+        st.baseKeys = base;
+        setKeys(base);
         setFeedback(chordPcs(res.atom).map(pc => PC_NAMES[pc]).join(" · "));
         setPhase("teach");
       } else {
@@ -219,13 +200,15 @@ export default function Practice() {
       return;
     }
     if (res.kind === "teach") {
-      setKeys(expectedKeyStates(res.atom, "exp"));
+      const base = expectedKeyStates(res.atom, "exp");
+      st.baseKeys = base;
+      setKeys(base);
       setPhase("teach");
     } else {
       setPhase("prompt");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expectedKeyStates, clearRunTimers]);
+  }, [expectedKeyStates]);
 
   const [blockIdxView, setBlockIdxView] = useState(0);
 
@@ -243,7 +226,7 @@ export default function Practice() {
     }
     st.blockIdx = idx;
     setBlockIdxView(idx);
-    setAtom(null); setKeys({}); setFeedback(""); setBeat(null);
+    setAtom(null); setKeys({}); setFeedback("");
     setPhase("interstitial");
     st.interTimer = window.setTimeout(beginBlock, 2600);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,7 +248,7 @@ export default function Practice() {
    *  fades in — so the next prompt reads as NEW even when it differs only by hand. */
   const advance = useCallback((delayMs = 0) => {
     setTimeout(() => {
-      setPhase("next"); setKeys({}); setBeat(null); // atom stays mounted so the outgoing prompt can fade
+      setPhase("next"); setKeys({}); // atom stays mounted so the outgoing prompt can fade
       ui.tick();
       setTimeout(serve, 380);
     }, delayMs);
@@ -294,7 +277,11 @@ export default function Practice() {
     const pcs = chordPcs(a);
     const subs = a.hand === "HT" ? subsumedBy(a) : [];
     const graded = gradeDiscreteChord(
-      { pcs, hand: a.hand as "RH" | "LH" | "HT", windowMs: windowFor(card), promptAtMs: st.promptAt, inversion: (a.inversion as number) ?? 0 },
+      {
+        pcs, hand: a.hand as "RH" | "LH" | "HT", windowMs: windowFor(card), promptAtMs: st.promptAt,
+        inversion: (a.inversion as number) ?? 0,
+        spreadMs: CHORD_SPREAD_MS + st.profileJitterMs, // every grading window widens by jitter (03 §3)
+      },
       st.collected,
       a.hand === "HT" ? {
         LH: subs.find(x => x.hand === "LH")?.id, RH: subs.find(x => x.hand === "RH")?.id,
@@ -320,42 +307,40 @@ export default function Practice() {
     return graded.primary;
   }, [logAttempt]);
 
-  const finalizeRun = useCallback((a: ScaleAtom | ArpAtom) => {
+  const finalizeRun = useCallback((a: ScaleAtom | ArpAtom, wrongMidi?: number) => {
     const st = S.current;
-    if (st.finalized) return;
-    st.finalized = true;
-    clearRunTimers();
     const run = st.run!;
-    // the raw stream is what gets logged; the profile latency applies only at judgment (03 §3)
-    const adjusted = st.collected.map(n => ({ ...n, onMs: n.onMs - st.profileLatencyMs }));
-    const { result, evennessCv, outOfWindow } = gradePulsedRun({
-      slots: run.slots, t0Ms: st.runT0, noteMs: st.runNoteMs,
-      windowMs: gridWindowMs(st.runNoteMs, st.profileJitterMs), promptAtMs: st.runT0,
-    }, adjusted);
+    const complete = st.runPos >= run.slots.length;
+    // self-paced (03 §6): pace decides Hard vs Good; a wrong note already stopped the flow
+    const result: GradeResult = complete && wrongMidi === undefined
+      ? selfPacedRunResult(st.runOnsets, st.runNoteMs)
+      : {
+          rating: 1, latencyMs: null, clean: false, inWindow: false,
+          errorEvents: [{ type: "substitution", playedMidi: wrongMidi, expectedMidi: run.slots[st.runPos]?.midis[0], tags: [] }],
+        };
     const attemptId = ulid();
     const nowMs = Date.now();
     const { card: after, row } = applyRep(st.card!, result, attemptId, { servedCount: st.served, nowMs });
     st.filler.cards.set(a.id, after);
     void saveCard(after);
     logAttempt(a, attemptId, nowMs, {
-      rating: result.rating, latencyMs: result.latencyMs, errors: result.errorEvents.length,
-      outOfWindow, evennessCv,
+      rating: result.rating, latencyMs: result.latencyMs, errors: result.errorEvents.length, paceMsPerNote: result.latencyMs,
     });
     void appendReview({ id: ulid(), ...row });
     if (result.rating === 1) {
       ui.err();
-      const errKeys: Record<number, KeyState> = {};
-      for (const e of result.errorEvents) if (e.playedMidi !== undefined) errKeys[e.playedMidi] = "err";
-      setKeys({ ...expectedKeyStates(a, "exp"), ...errKeys });
-      setFeedback(`Expected ${atomTitle(a)}`);
+      const base = { ...expectedKeyStates(a, "exp"), ...(wrongMidi !== undefined ? { [wrongMidi]: "err" as KeyState } : {}) };
+      st.baseKeys = base;
+      setKeys(base);
+      setFeedback(`Expected ${atomTitle(a)} — up and down`);
       setPhase("reconcile");
       return;
     }
     if (result.rating === 3) ui.good(); else ui.hard();
-    setFeedback(`${atomTitle(a)} · ${result.rating === 3 ? "Good" : "Hard"}`);
+    setFeedback(`${atomTitle(a)} · ${result.latencyMs} ms per note · ${result.rating === 3 ? "Good" : "Hard"}`);
     setPhase("good");
     advance(850);
-  }, [advance, clearRunTimers, expectedKeyStates, logAttempt]);
+  }, [advance, expectedKeyStates, logAttempt]);
 
   /** F4 spell (F4 §Variants: "tap its notes", octave-free): grade the tap stream. */
   const finalizeSpell = useCallback((a: ChordAtom, wrongMidi?: number) => {
@@ -377,7 +362,9 @@ export default function Practice() {
     if (res.rating === 1) {
       ui.err();
       st.reconcileMatched = new Set();
-      setKeys({ ...expectedKeyStates(a, "exp"), ...(wrongMidi !== undefined ? { [wrongMidi]: "err" as KeyState } : {}) });
+      const base = { ...expectedKeyStates(a, "exp"), ...(wrongMidi !== undefined ? { [wrongMidi]: "err" as KeyState } : {}) };
+      st.baseKeys = base;
+      setKeys(base);
       setFeedback(`Expected ${chordSymbol(a)} — ${tones}`);
       setPhase("reconcile");
       return;
@@ -508,9 +495,31 @@ export default function Practice() {
         }
         return;
       }
-      if (ph === "countin" || ph === "run") {
+      if (ph === "prompt" && !st.finalized) {
+        // the self-paced walker (03 §6/F5/F6): order-strict; a wrong note stops the flow
         st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
-        setKeys(k => ({ ...k, [n.midi]: st.run!.pathMidis.includes(n.midi) ? "ok" : "err" }));
+        const run = st.run!;
+        const slot = run.slots[st.runPos];
+        if (!slot) return;
+        if (slot.midis.includes(n.midi)) {
+          if (st.runSlotHit.has(n.midi)) return; // retrigger of a held key — chatter
+          st.runSlotHit.add(n.midi);
+          setKeys(k => ({ ...k, [n.midi]: "ok" }));
+          if (st.runSlotHit.size >= slot.midis.length) {
+            st.runOnsets.push(n.onMs);
+            st.runPos++;
+            st.runSlotHit = new Set();
+            if (st.runPos >= run.slots.length) { st.finalized = true; finalizeRun(a); }
+          }
+          return;
+        }
+        // a re-strike of the just-completed slot within a beat's breath is bounce, not a wrong note
+        const prev = st.runPos > 0 ? run.slots[st.runPos - 1] : null;
+        if (prev && prev.midis.includes(n.midi) && n.onMs - st.runOnsets[st.runOnsets.length - 1] < 200) return;
+        st.finalized = true;
+        ui.err();
+        setKeys(k => ({ ...k, [n.midi]: "err" }));
+        finalizeRun(a, n.midi);
       }
       return; // run reconcile continues by tap only (U2 v0)
     }
@@ -542,7 +551,7 @@ export default function Practice() {
         st.reconcileBuf = [];
         return;
       }
-      st.reconcileBuf = st.reconcileBuf.filter(x => n.onMs - x.onMs <= CHORD_SPREAD_MS * 1.5);
+      st.reconcileBuf = st.reconcileBuf.filter(x => n.onMs - x.onMs <= (CHORD_SPREAD_MS + st.profileJitterMs) * 1.5);
       if (!st.reconcileBuf.some(x => (a.hand === "HT" ? x.midi === n.midi : ((x.midi % 12) + 12) % 12 === pc))) {
         st.reconcileBuf.push({ midi: n.midi, onMs: n.onMs });
       }
@@ -559,7 +568,12 @@ export default function Practice() {
       if (st.matched.size >= need) {
         st.finalized = true; // exactly one grade per serve (log #74's double-finalize)
         void finalize(a).then(res => {
-          if (res.rating === 1) { ui.err(); enterReconcile(a, null); return; }
+          if (res.rating === 1) {
+            ui.err();
+            const timingOnly = res.errorEvents.length > 0 && res.errorEvents.every(e => e.type === "dropChordTone");
+            enterReconcile(a, null, timingOnly);
+            return;
+          }
           if (res.rating === 3) ui.good(); else ui.hard();
           setFeedback(`${chordSymbol(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
           setPhase("good");
@@ -576,13 +590,18 @@ export default function Practice() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finalize, advance, expectedKeyStates]);
 
-  const enterReconcile = useCallback((a: ChordAtom, wrongMidi: number | null) => {
+  const enterReconcile = useCallback((a: ChordAtom, wrongMidi: number | null, timingOnly = false) => {
     const st = S.current;
     st.reconcileBuf = [];
     st.reconcileArmedAt = performance.now() + RECONCILE_ARM_MS;
-    setKeys({ ...expectedKeyStates(a, "exp"), ...(wrongMidi !== null ? { [wrongMidi]: "err" as KeyState } : {}) });
+    const base = { ...expectedKeyStates(a, "exp"), ...(wrongMidi !== null ? { [wrongMidi]: "err" as KeyState } : {}) };
+    st.baseKeys = base;
+    setKeys(base);
     const tones = chordPcs(a).map(pc => PC_NAMES[pc]).join(" · ");
-    setFeedback(`Expected ${chordSymbol(a)} — ${tones}${a.hand === "HT" ? ", both hands" : ""}`);
+    // when timing was the ONLY failure, say so — a correct-keys take must never look mis-graded (03 §4)
+    setFeedback(timingOnly
+      ? `Right tones, not together — ${chordSymbol(a)} is one attack: ${tones}${a.hand === "HT" ? ", both hands" : ""}`
+      : `Expected ${chordSymbol(a)} — ${tones}${a.hand === "HT" ? ", both hands" : ""}`);
     setPhase("reconcile");
   }, [expectedKeyStates]);
 
@@ -630,20 +649,28 @@ export default function Practice() {
       }).catch(() => setDevice(null));
       await Promise.race([midiInit, new Promise(res => setTimeout(res, 1500))]);
       onNote(n => handleNote(n));
+      // a correct key's green lives with the note (U2, log #87): fade back to base on release
+      onNoteOff(({ midi }) => {
+        setKeys(k => {
+          if (k[midi] !== "ok") return k;
+          const next = { ...k };
+          const base = S.current.baseKeys[midi];
+          if (base) next[midi] = base; else delete next[midi];
+          return next;
+        });
+      });
       if (S.current.template) enterInterstitial(0);
       else serve();
     })();
     const onHide = () => { if (document.visibilityState === "hidden") void pushOutbox(); };
     document.addEventListener("visibilitychange", onHide);
     return () => {
-      alive = false; onNote(null);
+      alive = false; onNote(null); onNoteOff(null);
       document.removeEventListener("pointerdown", arm);
       document.removeEventListener("visibilitychange", onHide);
       const st = S.current;
       if (st.retryTimer !== null) clearTimeout(st.retryTimer);
-      if (st.finalizeTimer !== null) clearTimeout(st.finalizeTimer);
       if (st.interTimer !== null) clearTimeout(st.interTimer);
-      st.runClock?.stop();
       void pushOutbox();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -657,7 +684,7 @@ export default function Practice() {
   const subParts = atom === null ? null
     : isKeysAtom(atom) ? [`${atom.clef} clef`, atom.dir === "sigToKey" ? "name the key" : "pick the signature"]
     : isSpellAtom(atom) ? ["spell it", "any octave"]
-    : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave" : "up-down"]
+    : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave · up and down" : "up and down"]
     : [atom.hand as string, atom.form as string];
 
   return (
@@ -681,7 +708,7 @@ export default function Practice() {
             <span className="ml-2 text-[var(--accent-hi)]">check again</span>
           </button>
         )}
-        {(phase === "teach" || phase === "prompt" || phase === "countin" || phase === "run" || phase === "reconcile" || phase === "good" || phase === "next") && atom && (
+        {(phase === "teach" || phase === "prompt" || phase === "reconcile" || phase === "good" || phase === "next") && atom && (
           <div className={`flex w-full items-end justify-between gap-6 transition-opacity duration-200 ease-out ${phase === "next" ? "opacity-0" : "opacity-100"}`}>
             <div>
               {isKeysAtom(atom) && atom.dir === "sigToKey"
@@ -693,14 +720,6 @@ export default function Practice() {
               </div>
             </div>
             <div className="flex max-w-[52%] flex-col items-end gap-2 text-right">
-              {isRun && (phase === "countin" || phase === "run") && (
-                <div className="flex items-center gap-2">
-                  {Array.from({ length: RUN_BEATS_PER_BAR }, (_, i) => (
-                    <i key={i} className={`inline-block h-2 w-2 rounded-full ${beat && beat.b === i ? (beat.cIn ? "bg-[var(--ink2)]" : "bg-[var(--accent-hi)]") : "bg-[var(--border)]"}`} />
-                  ))}
-                  <span className="ml-1 text-[12px] text-[var(--ink2)]">♩={bpm}</span>
-                </div>
-              )}
               {phase === "teach" && (
                 <p className="max-w-72 text-[14px] text-[var(--ink2)]">
                   {isKeys ? `${feedback} — tap the highlighted answer`

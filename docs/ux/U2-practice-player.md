@@ -23,6 +23,7 @@ Answer → instant verdict. Correct = green LED sweep + latency chip (Spline Mon
 - The **metronome strip exists only when the item is pulsed** — a free-tempo drill shows none.
 - The latency chip shows **milliseconds after an answer, never status words** ("paused", "reconcile" and kin are banned).
 - The keybed keeps **piano-like key proportions in every orientation**: its height follows its width, so portrait never renders toothpick keys — landscape remains the designed home.
+- **A correct key's green lives with the note**: it lights on the press and fades away on the release — never a static stain. A wrong key's red mark stays until the next serve.
 
 ## Teach states (ungraded, rehearsal context — always)
 

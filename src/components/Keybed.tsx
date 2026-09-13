@@ -42,16 +42,20 @@ export const Keybed = memo(function Keybed({
   return (
     <div className="relative h-full w-full">
       <svg viewBox="0 0 100 15" preserveAspectRatio="none" className="block h-full w-full select-none">
+        {/* green lives with the note (U2): instant on the press, a soft fade on the release —
+            the transition duration is read from the NEW state, so gaining is fast, losing is slow */}
         {whites.map((m, i) => (
           <rect key={m} x={i * W + 0.06} y={0} width={W - 0.12} height={15} rx={0.35}
             fill={states[m] ? FILL[states[m]] : "#e9e6dd"} stroke="#0e1218" strokeWidth={0.12}
             opacity={states[m] ? 0.95 : 1}
+            style={{ transition: states[m] ? "fill 40ms" : "fill 320ms ease-out, opacity 320ms ease-out" }}
             onClick={onKeyTap ? () => onKeyTap(m) : undefined}
             className={onKeyTap ? "cursor-pointer" : undefined} />
         ))}
         {blacks.map(({ m, x }) => (
           <rect key={m} x={x} y={0} width={W * 0.64} height={9.2} rx={0.3}
             fill={states[m] ? FILL[states[m]] : "#161a20"} stroke="#0a0d12" strokeWidth={0.1}
+            style={{ transition: states[m] ? "fill 40ms" : "fill 320ms ease-out" }}
             onClick={onKeyTap ? () => onKeyTap(m) : undefined}
             className={onKeyTap ? "cursor-pointer" : undefined} />
         ))}

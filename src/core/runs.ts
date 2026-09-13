@@ -41,6 +41,19 @@ const line = (base: number, steps: number[]): number[] => {
 /** Ascend `up`, descend `down` (defaults to `up`) — apex sounded once. */
 const upDown = (up: number[], down = up): number[] => [...up, ...down.slice(0, -1).reverse()];
 
+/** Self-paced run rating (03 §6, log #87): a clean, complete run rates by PACE — the mean
+ *  inter-onset interval against the tier anchor's per-note budget. Hesitations and evenness
+ *  stay diagnostic; wrong notes never reach here (the flow stops for reconciliation). */
+export function selfPacedRunResult(slotOnsetsMs: number[], noteBudgetMs: number): {
+  rating: 2 | 3; latencyMs: number; clean: true; inWindow: boolean; errorEvents: never[];
+} {
+  const n = slotOnsetsMs.length;
+  const meanIoi = n > 1 ? (slotOnsetsMs[n - 1] - slotOnsetsMs[0]) / (n - 1) : 0;
+  const latencyMs = Math.round(meanIoi);
+  const inWindow = latencyMs <= noteBudgetMs;
+  return { rating: inWindow ? 3 : 2, latencyMs, clean: true, inWindow, errorEvents: [] };
+}
+
 export function buildRun(a: ScaleAtom | ArpAtom): Run {
   let rhSeq: number[];
   if (a.family === "scale") {

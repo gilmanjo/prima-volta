@@ -15,6 +15,7 @@ export interface DiscreteChordSpec {
   windowMs: number;          // the card's current latency window (tier-dependent, 03 §6)
   promptAtMs: number;
   inversion?: number;        // when set, the slash bass is graded: each hand's lowest tone = pcs[0]
+  spreadMs?: number;         // the attack window — base + the profile's jitter (03 §3/§4); default base
   key?: string;              // for error-event tagging
 }
 
@@ -22,6 +23,7 @@ function gradeOneHand(
   pcs: Pc[], notesIn: NoteEvent[], spec: DiscreteChordSpec, hand: "RH" | "LH",
   attackAnchorMs?: number, // HT passes the WHOLE attack's first onset: both hands share one window (03 §4)
 ): GradeResult {
+  const spreadMs = spec.spreadMs ?? CHORD_SPREAD_MS;
   const notes = [...notesIn].sort((a, b) => a.onMs - b.onMs); // judged in time order, never input order
   const want = new Set(pcs);
   const errors: ErrorEvent[] = [];
@@ -38,7 +40,7 @@ function gradeOneHand(
       const dt = n.onMs - completeAt;
       // notes inside the spread window of completion are part of the ATTACK and grade normally
       // (an extra hand is not a flourish); the grace covers only what comes after (03 §7)
-      if (dt > CHORD_SPREAD_MS && dt <= TRAILING_GRACE_MS) continue;
+      if (dt > spreadMs && dt <= TRAILING_GRACE_MS) continue;
     }
     const pc = ((n.midi % 12) + 12) % 12 as Pc;
     if (firstOn === null) firstOn = n.onMs;
@@ -58,7 +60,7 @@ function gradeOneHand(
   const anchor = attackAnchorMs ?? firstOn;
   if (anchor !== null) {
     for (const t of matchedAt.values()) {
-      if (t - anchor > CHORD_SPREAD_MS) errors.push({ type: "dropChordTone", hand, tags: [] });
+      if (t - anchor > spreadMs) errors.push({ type: "dropChordTone", hand, tags: [] });
     }
   }
   if (completeAt === null) {

@@ -43,7 +43,7 @@
 
 ## Grading defaults
 
-Rehearsal mode with metronome (arpeggios are inherently pulsed). Graded: note order (strict), completeness, **evenness** (IOI coefficient of variation — bad crossings show up here even though MIDI can't see fingers), tempo adherence at gate tiers. Turnaround ruling: top note played **once** at the apex of up-down (standard practice). Latency = prompt → first onset; total duration vs tempo gate.
+Rehearsal mode; shares F5's machinery. **Name-cue runs are self-paced** (03 §6 — the metronome and pulsed map belong to cue types that can engrave a note value; staff cues arrive later). Graded: note order (strict), completeness, **pace** — mean inter-onset interval against the tier anchor's per-note budget — for Hard vs Good; **evenness** (IOI coefficient of variation — bad crossings show up here even though MIDI can't see fingers) and hesitations diagnostic-only. Turnaround ruling: top note played **once** at the apex of up-down (standard practice), and the prompt says **up and down**.
 
 Fingering itself is ungradeable — evenness is the proxy. **Alternating (T6):** the handoff seam is the diagnostic — the inter-onset gap across each hand exchange is tracked and tagged `handoff`; evenness must survive the exchange. Teach states display **standard fingerings** on the path keys — the triad pattern system and its exceptions (all-black F♯ major and E♭ minor take the white-key pattern; B♭'s deviations) sourced and cross-verified from published charts, cited in the fingering data file. **dom7/dim7 per-key charts are not yet sourced** and display nothing until they are; we do not invent fingerings.
 

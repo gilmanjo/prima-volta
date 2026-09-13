@@ -1,7 +1,7 @@
 // Pulsed-run laws (03 §4 windowed matcher · 03 §6 pulsed map · F5/F6 run shapes), pinned —
 // with the personas that would notice them regressing (13's feature-ships-with-its-persona law).
 import { describe, it, expect } from "vitest";
-import { buildRun, runTempo } from "../src/core/runs";
+import { buildRun, runTempo, selfPacedRunResult } from "../src/core/runs";
 import { gradePulsedRun, gridWindowMs, type PulsedRunSpec } from "../src/core/grader/pulsed";
 import { afterTeach, applyRep, newCard } from "../src/core/scheduler";
 import type { ArpAtom, ScaleAtom } from "../src/core/catalog";
@@ -127,6 +127,28 @@ describe("the gate tempo (F5/F6 anchors, ruled: ♪=80 = eighths at a ♩=80 cli
     const sloppy = gradePulsedRun(spec(slots, gate), play(slots, i => (i % 3 === 0 ? 100 : 0), gate));
     expect(sloppy.result.rating).toBe(1); // 100ms late on several onsets: out at the gate, fine at ♩=60
     expect(sloppy.result.errorEvents.every(e => e.type === "late")).toBe(true);
+  });
+});
+
+describe("self-paced runs (03 §6, log #87) — name-cue serves pace, not entrainment", () => {
+  const onsets = (ioiMs: number, n = 15) => Array.from({ length: n }, (_, i) => 5000 + i * ioiMs);
+
+  it("a clean run at or under the per-note budget → Good; latency = the mean inter-onset interval", () => {
+    const r = selfPacedRunResult(onsets(700), 1000);
+    expect(r.rating).toBe(3);
+    expect(r.latencyMs).toBe(700);
+    expect(r.inWindow).toBe(true);
+  });
+
+  it("a clean but slower run → Hard — hesitations stay diagnostic, only pace rates", () => {
+    const r = selfPacedRunResult(onsets(1400), 1000);
+    expect(r.rating).toBe(2);
+    expect(r.clean).toBe(true);
+  });
+
+  it("the gate demands the anchor's pace: 375 ms per note (♪=80 as pace, not clicks)", () => {
+    expect(selfPacedRunResult(onsets(360), runTempo(1).noteMs).rating).toBe(3);
+    expect(selfPacedRunResult(onsets(430), runTempo(1).noteMs).rating).toBe(2);
   });
 });
 
