@@ -10,3 +10,4 @@ coverage/
 .dev.vars
 .DS_Store
 spikes/*/results/
+*.tsbuildinfo

@@ -13,7 +13,7 @@ One screen, four zones, every drill modality. Entered from any launcher; exits b
 
 ## Rep flow (rehearsal) — errors stop for reconciliation
 
-Answer → instant verdict. Correct = green LED sweep + latency chip (Spline Mono) + the UI ding, straight on. **Error = the flow stops** (hub rule): felt-red on the offending keys, **expected vs played side by side on the keybed** (engraving highlighted for staff cues), and a **replay affordance** where hearing helps — yours vs expected via smplr (chords, intervals). Continue by tap — **or by playing the correct answer, which advances instantly and is the reconciliation working as intended.** The card's rating already took the hit (03); the pause is for understanding, not punishment.
+Answer → instant verdict. Correct = green LED sweep + latency chip (Spline Mono) + the UI ding, then a short **between-items beat** (a blank breath + the serve tick) so the next prompt reads as *new* even when it differs only by hand. **Error = the flow stops** (hub rule): felt-red on the offending keys, **expected vs played side by side on the keybed** (engraving highlighted for staff cues) with the expected tones named in the feedback line, and a **replay affordance** where hearing helps — yours vs expected via smplr (chords, intervals). Continue by tap — **or by playing the correct answer as a fresh attack** (the tones together, after a settle-beat that keeps the failed take's tail from bleeding in; loose noodling never advances). The card's rating already took the hit (03); the pause is for understanding, not punishment.
 
 ## Player copy & display rules
 

@@ -83,7 +83,9 @@ export function applyRep(
     tier: card.tier, derived, parentAttemptId, paramGroup: "A", reviewedAt: ctx.nowMs,
   };
   let c: DrillCard = { ...card, lastReviewAt: ctx.nowMs };
-  c = applyGateStreak(c, res);
+  // Gates are spaced-evidence territory (02 §1, log #75): step-phase reps never arm or move
+  // a gate in either direction — month-one Good stays month-one (03 §6).
+  if (card.step === "graduated") c = applyGateStreak(c, res);
 
   const confirmDue = () => { c.step = "confirm"; c.stepDueItems = ctx.servedCount + CONFIRM_AFTER_ITEMS; c.stepDueMs = ctx.nowMs + CONFIRM_AFTER_MS; };
   const againNowDue = () => { c.step = "againNow"; c.stepDueItems = ctx.servedCount + AGAIN_NOW_AFTER_ITEMS; c.stepDueMs = ctx.nowMs + 2 * 60_000; };
@@ -98,12 +100,17 @@ export function applyRep(
       break;
     case "confirm":
       if (res.rating === 3) {
-        // graduate to FSRS under the 1-day cap (04 §2)
-        let f = createEmptyCard(new Date(ctx.nowMs));
-        f = F.next(f, new Date(ctx.nowMs), FRating.Good).card;
-        const cap = ctx.nowMs + GRADUATING_CAP_DAYS * 86_400_000;
-        if (f.due.getTime() > cap) f = { ...f, due: new Date(cap) };
-        c.step = "graduated"; c.fsrs = f; c.stepDueItems = null; c.stepDueMs = null;
+        if (c.fsrs) {
+          // a lapsed graduate finishing relearn: FSRS already took the lapse — never reset it
+          c.step = "graduated"; c.stepDueItems = null; c.stepDueMs = null;
+        } else {
+          // first graduation to FSRS, under the 1-day cap (04 §2)
+          let f = createEmptyCard(new Date(ctx.nowMs));
+          f = F.next(f, new Date(ctx.nowMs), FRating.Good).card;
+          const cap = ctx.nowMs + GRADUATING_CAP_DAYS * 86_400_000;
+          if (f.due.getTime() > cap) f = { ...f, due: new Date(cap) };
+          c.step = "graduated"; c.fsrs = f; c.stepDueItems = null; c.stepDueMs = null;
+        }
       } else againNowDue();
       break;
     case "graduated": {

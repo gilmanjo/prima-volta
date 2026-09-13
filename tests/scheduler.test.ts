@@ -49,25 +49,48 @@ describe("steps (04 §2)", () => {
   });
 });
 
-describe("gate streaks — held, not owned (02 §1, log #67)", () => {
-  it("3 consecutive in-window reps earn the gate; the window tightens", () => {
+describe("gate streaks — held, not owned, graduated reps only (02 §1, logs #67/#75)", () => {
+  const graduate = () => {
     let c = afterTeach(newCard("a1", 0));
-    expect(windowFor(c)).toBe(5000);
+    ({ card: c } = applyRep(c, good(), "g1", ctx(0)));          // learn (step-phase)
+    ({ card: c } = applyRep(c, good(), "g2", ctx(25)));         // confirm → graduated
+    return c;
+  };
+
+  it("step-phase reps never arm a gate — month-one Good stays month-one (03 §6)", () => {
+    let c = afterTeach(newCard("a1", 0));
     for (const t of ["t1", "t2", "t3"]) ({ card: c } = applyRep(c, good(), t, ctx(0)));
+    // three identical Goods: learn + confirm were step-phase (no gate touch);
+    // only the third — played on the graduated card — opened the streak
+    expect(c.tier).toBe(0);
+    expect(c.gateStreak).toBe(1);
+    expect(windowFor(c)).toBe(5000);
+  });
+
+  it("3 consecutive in-window GRADUATED reps earn the gate; the window tightens", () => {
+    let c = graduate();
+    for (const t of ["t3", "t4", "t5"]) ({ card: c } = applyRep(c, good(), t, ctx(30)));
     expect(c.tier).toBe(1);
     expect(windowFor(c)).toBe(900);
   });
 
   it("at the gate, 3 consecutive out-of-window reps — wrong OR slow — release it; one slow rep does nothing", () => {
-    let c = afterTeach(newCard("a1", 0));
-    for (const t of ["t1", "t2", "t3"]) ({ card: c } = applyRep(c, good(), t, ctx(0)));
-    ({ card: c } = applyRep(c, slow(), "s1", ctx(0)));
+    let c = graduate();
+    for (const t of ["t3", "t4", "t5"]) ({ card: c } = applyRep(c, good(), t, ctx(30)));
+    ({ card: c } = applyRep(c, slow(), "s1", ctx(30)));
     expect(c.tier).toBe(1); // a single slow rep touches nothing
-    ({ card: c } = applyRep(c, good(600), "g", ctx(0)));
+    ({ card: c } = applyRep(c, good(600), "g", ctx(30)));
     expect(c.gateStreak).toBe(1); // an in-window rep breaks the release streak
-    ({ card: c } = applyRep(c, slow(), "s2", ctx(0)));
-    ({ card: c } = applyRep(c, again(), "s3", ctx(0)));
-    ({ card: c } = applyRep(c, slow(), "s4", ctx(0)));
+    ({ card: c } = applyRep(c, slow(), "s2", ctx(30)));
+    ({ card: c } = applyRep(c, again(), "s3", ctx(31)));
+    // the Again queued a relearn step — step-phase reps never touch the gate streak
+    const lapsesBefore = c.fsrs!.lapses;
+    ({ card: c } = applyRep(c, good(600), "relearn", ctx(35)));   // againNow → confirm
+    expect(c.gateStreak).toBe(-2);
+    ({ card: c } = applyRep(c, good(600), "confirm2", ctx(60)));  // relearn complete → graduated, FSRS intact
+    expect(c.step).toBe("graduated");
+    expect(c.fsrs!.lapses).toBe(lapsesBefore);                    // never reset by re-graduation
+    ({ card: c } = applyRep(c, slow(), "s4", ctx(61)));           // graduated, out-of-window → third strike
     expect(c.tier).toBe(0); // released — re-earn the same way
   });
 });
@@ -104,7 +127,9 @@ describe("serving exports (04 §6)", () => {
     let weak = afterTeach(newCard("w", 0));
     expect(servingPriority(weak, 0)).toBeGreaterThan(0.8); // step-phase = maximally weak
     ({ card: weak } = applyRep(weak, good(), "t1", ctx(0)));
-    ({ card: weak } = applyRep(weak, good(), "t2", ctx(25)));
+    ({ card: weak } = applyRep(weak, good(), "t2", ctx(25))); // graduated (streak untouched by steps)
+    ({ card: weak } = applyRep(weak, good(), "t3", ctx(30)));
+    ({ card: weak } = applyRep(weak, good(), "t4", ctx(31)));
     expect(weak.gateStreak).toBe(2);
     expect(servingPriority(weak, 1_000_000)).toBeGreaterThanOrEqual(0.2); // gate-pending bonus present
   });

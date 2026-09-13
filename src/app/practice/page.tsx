@@ -12,9 +12,13 @@ import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from ".
 import { ulid } from "../../core/ulid";
 import type { NoteEvent, Pc } from "../../core/types";
 import { defaultProfile, deviceName, initMidi, onNote } from "../../services/midi";
+import { ensureAudio, ui } from "../../services/uiAudio";
 import { appendAttempt, appendReview, loadCards, pushOutbox, saveCard } from "../../services/store";
+import { PC_NAMES } from "../../core/catalog";
+import { CHORD_SPREAD_MS } from "../../core/constants";
 
-type Phase = "init" | "teach" | "prompt" | "reconcile" | "good" | "polishing" | "unavailable";
+type Phase = "init" | "teach" | "prompt" | "reconcile" | "good" | "next" | "polishing" | "unavailable";
+const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never bleeds in (U2)
 
 const POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
   .filter(a => a.answer === "midi" && !a.stream && a.cue === "name" && a.form === "blocked")
@@ -31,7 +35,8 @@ export default function Practice() {
     filler: FillerState; served: number; boutId: string; profileId: string | null;
     card: DrillCard | null; promptAt: number; collected: NoteEvent[]; matched: Set<number>;
     reconcileMatched: Set<number>; sinceSync: number; finalized: boolean; retryTimer: number | null;
-  }>({ filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, served: 0, boutId: ulid(), profileId: null, card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(), sinceSync: 0, finalized: false, retryTimer: null });
+    reconcileArmedAt: number; reconcileBuf: { midi: number; onMs: number }[];
+  }>({ filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, served: 0, boutId: ulid(), profileId: null, card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(), sinceSync: 0, finalized: false, retryTimer: null, reconcileArmedAt: 0, reconcileBuf: [] });
 
   const phaseRef = useRef<Phase>("init");
   const atomRef = useRef<ChordAtom | null>(null);
@@ -79,6 +84,16 @@ export default function Practice() {
     }
   }, [expectedKeyStates]);
 
+  /** The between-items beat (U2): a blank breath + the serve tick, so the next prompt
+   *  reads as NEW even when it differs only by hand. */
+  const advance = useCallback((delayMs = 0) => {
+    setTimeout(() => {
+      setPhase("next"); setAtom(null); setKeys({}); setFeedback("");
+      ui.tick();
+      setTimeout(serve, 380);
+    }, delayMs);
+  }, [serve]);
+
   const finalize = useCallback(async (a: ChordAtom) => {
     const st = S.current;
     const card = st.card!;
@@ -124,20 +139,35 @@ export default function Practice() {
     const want = new Set(chordPcs(a));
     const need = a.hand === "HT" ? want.size * 2 : want.size;
 
-    if (ph === "teach" || ph === "reconcile") {
-      // advance by playing the correct answer (11's reconciliation rule — instant)
+    if (ph === "teach") {
       if (want.has(pc)) {
         st.reconcileMatched.add(a.hand === "HT" ? n.midi : pc);
         setKeys(k => ({ ...k, [n.midi]: "ok" }));
         if (st.reconcileMatched.size >= need) {
-          if (ph === "teach") {
-            const taught = afterTeach(st.card!);
-            st.filler.cards.set(a.id, taught);
-            void saveCard(taught);
-          }
-          setTimeout(serve, 350);
+          const taught = afterTeach(st.card!);
+          st.filler.cards.set(a.id, taught);
+          void saveCard(taught);
+          advance(300);
         }
       }
+      return;
+    }
+    if (ph === "reconcile") {
+      // continue only by playing the correct answer AS A FRESH ATTACK (U2, log #75):
+      // armed after a settle-beat; the tones together; loose noodling never advances.
+      if (performance.now() < st.reconcileArmedAt) return;
+      if (!want.has(pc)) {
+        // a wrong key just flashes and resets the fresh-attack buffer — never advances
+        setKeys({ ...expectedKeyStates(a, "exp"), [n.midi]: "err" });
+        st.reconcileBuf = [];
+        return;
+      }
+      st.reconcileBuf = st.reconcileBuf.filter(x => n.onMs - x.onMs <= CHORD_SPREAD_MS * 1.5);
+      if (!st.reconcileBuf.some(x => (a.hand === "HT" ? x.midi === n.midi : ((x.midi % 12) + 12) % 12 === pc))) {
+        st.reconcileBuf.push({ midi: n.midi, onMs: n.onMs });
+      }
+      setKeys(k => ({ ...k, [n.midi]: "ok" }));
+      if (st.reconcileBuf.length >= need) { ui.good(); advance(250); }
       return;
     }
     if (ph !== "prompt" || st.finalized) return;
@@ -149,31 +179,39 @@ export default function Practice() {
       if (st.matched.size >= need) {
         st.finalized = true; // exactly one grade per serve (log #74's double-finalize)
         void finalize(a).then(res => {
-          if (res.rating === 1) { enterReconcile(a, null); return; }
+          if (res.rating === 1) { ui.err(); enterReconcile(a, null); return; }
+          if (res.rating === 3) ui.good(); else ui.hard();
           setFeedback(`${chordSymbol(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
           setPhase("good");
-          setTimeout(serve, 900);
+          advance(850);
         });
       }
     } else {
       // wrong answer: the flow stops for reconciliation (11 global rule)
       st.finalized = true;
+      ui.err();
       setKeys(k => ({ ...k, [n.midi]: "err" }));
       void finalize(a).then(() => enterReconcile(a, n.midi));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finalize, serve]);
+  }, [finalize, advance, expectedKeyStates]);
 
   const enterReconcile = useCallback((a: ChordAtom, wrongMidi: number | null) => {
     const st = S.current;
-    st.reconcileMatched = new Set();
+    st.reconcileBuf = [];
+    st.reconcileArmedAt = performance.now() + RECONCILE_ARM_MS;
     setKeys({ ...expectedKeyStates(a, "exp"), ...(wrongMidi !== null ? { [wrongMidi]: "err" as KeyState } : {}) });
-    setFeedback("Expected — play it, or tap to continue");
+    const tones = chordPcs(a).map(pc => PC_NAMES[pc]).join(" · ");
+    setFeedback(`Expected ${chordSymbol(a)} — ${tones}${a.hand === "HT" ? ", both hands" : ""}`);
     setPhase("reconcile");
   }, [expectedKeyStates]);
 
   useEffect(() => {
     let alive = true;
+    // arm the UI cues: sticky activation covers client-side nav; any first touch covers a cold load
+    ensureAudio();
+    const arm = () => ensureAudio();
+    document.addEventListener("pointerdown", arm);
     (async () => {
       const cards = await loadCards();
       if (!alive) return;
@@ -190,11 +228,9 @@ export default function Practice() {
     })();
     const onHide = () => { if (document.visibilityState === "hidden") void pushOutbox(); };
     document.addEventListener("visibilitychange", onHide);
-    return () => { alive = false; onNote(null); document.removeEventListener("visibilitychange", onHide); void pushOutbox(); };
+    return () => { alive = false; onNote(null); document.removeEventListener("pointerdown", arm); document.removeEventListener("visibilitychange", onHide); void pushOutbox(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const sub = atom ? [atom.hand, atom.form].filter(Boolean).join(" · ") : "";
 
   return (
     <main className="flex h-dvh flex-col">
@@ -221,19 +257,24 @@ export default function Practice() {
           <div className="flex w-full items-end justify-between gap-6">
             <div>
               <div className="font-serif text-6xl leading-none">{chordSymbol(atom)}</div>
-              <div className="mt-2 text-[13px] text-[var(--ink2)]">{sub}</div>
+              <div className="mt-2 text-[16px]">
+                <span className="text-[var(--ink)]">{atom.hand as string}</span>
+                <span className="text-[var(--ink2)]"> · {atom.form as string}</span>
+              </div>
             </div>
-            <div className="max-w-[46%] text-right">
+            <div className="max-w-[52%] text-right">
               {phase === "teach" && <p className="text-[14px] text-[var(--ink2)]">Ungraded — take your time</p>}
               {phase === "good" && <p className="text-[14px] text-[var(--good)]">{feedback}</p>}
               {phase === "reconcile" && (
-                <button onClick={serve} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-[14px] text-[var(--ink)]">
-                  {feedback} <span className="ml-2 text-[var(--accent-hi)]">Continue</span>
+                <button onClick={() => advance(0)} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-left text-[14px] leading-relaxed text-[var(--ink)]">
+                  <span className="text-[var(--felt)]">{feedback}</span>
+                  <span className="mt-1 block text-[13px] text-[var(--ink2)]">Play it together — or tap to continue</span>
                 </button>
               )}
             </div>
           </div>
         )}
+        {phase === "next" && <p className="mx-auto text-[13px] text-[var(--muted)]">·</p>}
         {phase === "init" && <p className="mx-auto text-[14px] text-[var(--muted)]">loading…</p>}
       </section>
 
