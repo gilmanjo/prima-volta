@@ -39,6 +39,8 @@
 
 **Anchor notation:** as F5's — ♪=N means notes as eighths against a quarter-note click at ♩=N, two per beat; learning tiers play one note per beat.
 
+**Admission nesting (05 §2):** the ladder's stages are the slow axis, each sweeping the full key wave before the next opens — triads HS (maj then min, all keys) → triads HT (all keys) → sevenths HS → sevenths HT → alternating last.
+
 ## Grading defaults
 
 Rehearsal mode with metronome (arpeggios are inherently pulsed). Graded: note order (strict), completeness, **evenness** (IOI coefficient of variation — bad crossings show up here even though MIDI can't see fingers), tempo adherence at gate tiers. Turnaround ruling: top note played **once** at the apex of up-down (standard practice). Latency = prompt → first onset; total duration vs tempo gate.

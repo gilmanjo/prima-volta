@@ -40,7 +40,7 @@
 
 **Anchor notation:** ♪=N means notes as **eighths against a quarter-note click at ♩=N** — two notes per beat, so T4's ♪=80 is ~160 notes/min (the learning tiers play one note per beat; the metronome always clicks the quarter).
 
-Keys enter along the ladder's key axis (05), the same staggering F4's quality order rides — C/G/F first, flat/sharp regions later. Tiers apply per scale type; the anchor tempos shown are major's values, which each type's data entry inherits or overrides.
+Keys enter along the ladder's key axis (05), the same staggering F4's quality order rides — C/G/F first, flat/sharp regions later. **The hand axis is the slowest (05 §2's nesting):** hands-separate sweeps every key — RH · LH adjacently per key — before any key's hands-together atom admits; HT is much harder on scales and never follows HS of the same key directly. Tiers apply per scale type; the anchor tempos shown are major's values, which each type's data entry inherits or overrides.
 
 **Viewport policy (T5 and any scrolled view):** the visible window follows the **expected path** — beat-indexed to where the hand should be — never the played keys. Leading the hand supports reading ahead; chasing input would jitter on every error.
 

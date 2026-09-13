@@ -51,7 +51,10 @@ const QUALITY_ORDER = ["maj", "min", "maj7", "dom7", "m7", "dim", "m7b5", "dim7"
 const KEY_WAVE_PCS: Pc[][] = [[0], [7, 5], [2], [10], [9, 3], [4, 8], [11, 1], [6]]; // C · G,F · D · B♭ · A,E♭ · E,A♭ · B,D♭ · F♯/G♭
 const waveOf = (pc: Pc) => KEY_WAVE_PCS.findIndex(w => w.includes(pc));
 
-/** Sortable admission key for F4 play/knowledge atoms (lower = admits earlier). */
+/** Sortable admission key for F4 play/knowledge atoms (lower = admits earlier).
+ *  The nesting (05 §2, log #79): difficulty tier is the SLOWEST axis — every quality × key
+ *  admits at root-position HS before the first inversion opens anywhere; within a tier,
+ *  quality order × the key wave; hands-separate siblings walk adjacently per key. */
 export function chordAdmissionKey(a: ChordAtom): number[] {
   const q = QUALITY_ORDER.indexOf(a.quality);
   const w = waveOf(a.root);
@@ -65,21 +68,27 @@ export function chordAdmissionKey(a: ChordAtom): number[] {
     (a.inversion ?? 0) > 0 ? 2 : 1;
   const hand = a.hand === "RH" ? 0 : a.hand === "LH" ? 1 : 2;
   const cue = a.cue === "staff" ? 1 : 0;
-  return [q, w, tier, a.inversion ?? 0, cue, hand];
+  return [tier, q, a.inversion ?? 0, w, cue, hand];
 }
 
 const SCALE_TYPE_ORDER: ScaleType[] = ["major", "minorNatural", "minorHarmonic", "minorMelodic", "chromatic"];
 const ARP_BASIS_ORDER = ["maj", "min", "dom7", "dim7"]; // F6: triads (T1) before sevenths (T4)
 const HAND_ORDER = { RH: 0, LH: 1, HT: 2, alternating: 3 };
 
-/** Admission key for F5 atoms: type × key wave × hand × cue (05 §2's family-local ladder). */
+/** Admission key for F5 atoms (05 §2's nesting): the hand axis is the SLOWEST — hands-separate
+ *  sweeps every type × key (RH · LH adjacent per key) before any hands-together atom admits. */
 export function scaleAdmissionKey(a: ScaleAtom): number[] {
-  return [SCALE_TYPE_ORDER.indexOf(a.type), waveOf(a.key), HAND_ORDER[a.hand], a.cue === "keysig" ? 1 : 0];
+  const stage = a.hand === "HT" ? 1 : 0;
+  return [stage, SCALE_TYPE_ORDER.indexOf(a.type), waveOf(a.key), HAND_ORDER[a.hand], a.cue === "keysig" ? 1 : 0];
 }
 
-/** Admission key for F6 atoms: basis × key wave × hand (alternating last — the T6 capstone). */
+/** Admission key for F6 atoms — the ladder's own stage order, each sweeping the full wave
+ *  (F6 §Admission nesting): triads HS → triads HT → sevenths HS → sevenths HT → alternating. */
 export function arpAdmissionKey(a: ArpAtom): number[] {
-  return [ARP_BASIS_ORDER.indexOf(a.basis), waveOf(a.root), HAND_ORDER[a.hand]];
+  const basisIdx = ARP_BASIS_ORDER.indexOf(a.basis);
+  const seventh = basisIdx >= 2 ? 1 : 0;
+  const stage = a.hand === "alternating" ? 4 : seventh * 2 + (a.hand === "HT" ? 1 : 0);
+  return [stage, basisIdx, waveOf(a.root), HAND_ORDER[a.hand]];
 }
 
 const FAMILY_ORDER: Record<string, number> = { chord: 0, scale: 1, arp: 2 };

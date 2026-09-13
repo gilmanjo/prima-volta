@@ -17,7 +17,7 @@
   cue: name | staff,  answer: midi | choice }
 ```
 
-**Quality order** (admission sequencing; scope stays per-quality, 02 §5): **maj → min → maj7 → 7 → m7 → dim → m7♭5 → dim7 → aug** — each quality's atoms enter along the key wave before the next quality begins. (The old `triads-core`-style sets are gone; they served the deleted unlock table.)
+**Quality order** (admission sequencing; scope stays per-quality, 02 §5): **maj → min → maj7 → 7 → m7 → dim → m7♭5 → dim7 → aug** — within each difficulty tier, each quality sweeps the key wave before the next quality begins; **the tier axis is the slowest of all (05 §2's nesting)** — every quality × key admits at root-position hands-separate before the first inversion opens anywhere. (The old `triads-core`-style sets are gone; they served the deleted unlock table.)
 
 **Name-cue notation:** proper chord symbols with **slash notation for inversions** — "A♭maj7/C" (1st inversion), "B♭/F" (2nd) — the notation lead sheets actually use. The subtext never repeats what the symbol already says (quality, inversion); it carries only hand and form ("RH · blocked").
 
@@ -33,7 +33,7 @@
 
 ## Tier ladder (execution only)
 
-**The ladder describes execution** — what it means to progress is playing demands rising. Tiers apply per quality; each quality climbs independently, staggered along the key wave (05 §2). **Knowledge variants (identify · spell · engraving-pick) are tierless flat atoms**: they admit on the same quality × key wave, but there is no ladder to climb — nothing about identifying a chord "progresses" the way playing one does.
+**The ladder describes execution** — what it means to progress is playing demands rising. Tiers order each quality's demands, but admission nests the tier axis slowest (05 §2): a tier opens only after the previous tier has swept quality order × the full key wave. **Knowledge variants (identify · spell · engraving-pick) are tierless flat atoms**: they admit on the same quality × key wave, but there is no ladder to climb — nothing about identifying a chord "progresses" the way playing one does.
 
 | Tier | Content |
 |---|---|

@@ -109,7 +109,9 @@ describe("drill-loop personas (13 — real modules, virtual weeks)", () => {
     const over = run(PERSONAS.overreacher, 10, 60);
     const work = run(PERSONAS.worker, 10, 60);
     const unique = (r: ReturnType<typeof run>) => [...r.state.cards.values()].filter(c => c.step === "graduated").length;
-    expect(over.againNows).toBeGreaterThan(work.againNows * 3); // the churn signature
+    // 2.5× discrimination bar (was 3×: the #79 admission nesting made early serving
+    // root-HS-heavy, which narrows the personas' churn gap slightly — still unmistakable)
+    expect(over.againNows).toBeGreaterThan(work.againNows * 2.5); // the churn signature
     expect(unique(over)).toBeLessThanOrEqual(unique(work));     // errors never grow the cohort
     // note: raw `graduations` counts RE-graduations after lapses — churn inflates it by design
   });
