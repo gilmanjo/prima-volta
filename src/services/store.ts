@@ -64,6 +64,18 @@ export async function appendReview(r: ReviewRow & { id: string }): Promise<void>
   await store.put("outbox", `review:${r.id}`, { kind: "review", payload: r });
 }
 
+import type { DeviceProfile } from "./midi";
+
+/** A measured device profile (03 §3): saved locally and synced — config, never history. */
+export async function saveProfile(p: DeviceProfile & { calibratedAt: number }): Promise<void> {
+  await store.put("profiles", p.id, p);
+  await store.put("outbox", `profile:${p.id}`, { kind: "profile", payload: p });
+}
+
+export async function loadProfile(id: string): Promise<(DeviceProfile & { calibratedAt?: number }) | undefined> {
+  return store.get("profiles", id);
+}
+
 /** The current bout's id for an attempt happening NOW (08 §6): continues the sitting within
  *  the idle window, else closes the stale bout at its last activity and opens a fresh one. */
 export async function touchBout(profileId: string | null, nowMs: number): Promise<string> {

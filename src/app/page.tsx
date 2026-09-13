@@ -31,7 +31,10 @@ export default function Home() {
     <main className="mx-auto max-w-xl px-6 py-10">
       <div className="flex items-baseline justify-between">
         <h1 className="font-serif text-3xl">Prima Volta</h1>
-        <span className="text-xs text-[var(--ink2)]">{catalog.defaults("chord").length.toLocaleString()} chord drills in scope</span>
+        <span className="text-xs text-[var(--ink2)]">
+          {catalog.defaults("chord").length.toLocaleString()} chord drills in scope
+          <Link href="/settings" className="ml-3 text-[var(--ink2)] underline decoration-[var(--border)] underline-offset-2">devices</Link>
+        </span>
       </div>
 
       <div className="mt-8 space-y-2">

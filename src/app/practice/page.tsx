@@ -26,7 +26,7 @@ import { STARTER_TEMPLATE, type PracticeTemplate, type TemplateBlock } from "../
 import { defaultProfile, initMidi, onNote } from "../../services/midi";
 import { startRunClock, type RunClock } from "../../services/metronome";
 import { ensureAudio, ui } from "../../services/uiAudio";
-import { appendAttempt, appendReview, attachBoutProfile, loadCards, pushOutbox, saveCard, touchBout } from "../../services/store";
+import { appendAttempt, appendReview, attachBoutProfile, loadCards, loadProfile, pushOutbox, saveCard, touchBout } from "../../services/store";
 
 type Phase = "init" | "teach" | "prompt" | "countin" | "run" | "reconcile" | "good" | "next" | "interstitial" | "done" | "polishing" | "unavailable";
 const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never bleeds in (U2)
@@ -521,12 +521,16 @@ export default function Practice() {
       const midiInit = initMidi(name => {
         setDevice(name);
         if (name) {
-          const p = defaultProfile(name);
-          S.current.profileId = p.id;
-          S.current.profileLatencyMs = p.latencyMs;
-          S.current.profileJitterMs = p.jitterMs;
+          const d = defaultProfile(name);
+          S.current.profileId = d.id;
+          S.current.profileLatencyMs = d.latencyMs;
+          S.current.profileJitterMs = d.jitterMs;
+          // the measured profile wins over rig defaults when the ritual has run (03 §3, U7)
+          void loadProfile(d.id).then(saved => {
+            if (saved) { S.current.profileLatencyMs = saved.latencyMs; S.current.profileJitterMs = saved.jitterMs; }
+          });
           // a bout opens on device detect (08 §6); attach the profile if it opened without one
-          void touchBout(p.id, Date.now()).then(() => attachBoutProfile(p.id));
+          void touchBout(d.id, Date.now()).then(() => attachBoutProfile(d.id));
         }
       }).catch(() => setDevice(null));
       await Promise.race([midiInit, new Promise(res => setTimeout(res, 1500))]);
