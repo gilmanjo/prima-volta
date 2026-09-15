@@ -2,7 +2,7 @@
 // instances, T2's the-F-line-IS-F♯ semantics, octave-strict grading with the wrongOctave
 // diagnosis, and the crossed-dimension admission ladder.
 import { describe, it, expect } from "vitest";
-import { compareAdmission, type ReadingAtom } from "../src/core/catalog";
+import { compareAdmission, knowledgeAnswerable, type DrillAtom, type ReadingAtom } from "../src/core/catalog";
 import { gradeSingleNote } from "../src/core/grader/note";
 import { sampleReading, sigEffect, spellSounding } from "../src/core/reading";
 
@@ -58,6 +58,23 @@ describe("the crossed-dimension ladder (F2 §Tier ladder — the later dimension
   });
   it("crossed atoms admit at their LATER dimension: doubles-under-signatures behind T4", () => {
     before(atom({ band: "ledger3" }), atom({ keyContext: "ks14", accidental: "double" }));
+  });
+});
+
+describe("knowledge-only mode's filter (08 §7 — the filler AND the map apply it)", () => {
+  it("choice-answerable: keys, chord spell, reading selector — and nothing at-instrument", () => {
+    const cases: [Partial<DrillAtom> & { family: string }, boolean][] = [
+      [{ family: "keys", sig: 0, mode: "major", clef: "treble", dir: "sigToKey" }, true],
+      [{ family: "chord", root: 0, quality: "maj", answer: "spell" }, true],
+      [{ family: "reading", clef: "treble", band: "staff12", keyContext: "open", accidental: "none", answer: "selector" }, true],
+      [{ family: "reading", clef: "treble", band: "staff12", keyContext: "open", accidental: "none", answer: "midi" }, false],
+      [{ family: "chord", root: 0, quality: "maj", answer: "midi", hand: "RH", form: "blocked", cue: "name" }, false],
+      [{ family: "scale", type: "major", key: 0, hand: "RH", cue: "name" }, false],
+      [{ family: "arp", basis: "maj", root: 0, hand: "RH", start: "root" }, false],
+    ];
+    for (const [a, want] of cases) {
+      expect(knowledgeAnswerable({ id: "x", inDefault: true, ...a } as DrillAtom)).toBe(want);
+    }
   });
 });
 

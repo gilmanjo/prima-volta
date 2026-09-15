@@ -6,7 +6,7 @@ import type { Pc } from "./types";
 
 export const LETTERS = ["C", "D", "E", "F", "G", "A", "B"] as const;
 const LETTER_PC: number[] = [0, 2, 4, 5, 7, 9, 11];
-const ACC_GLYPH: Record<number, string> = { [-2]: "𝄫", [-1]: "♭", 0: "♮", 1: "♯", 2: "𝄪" };
+export const ACC_GLYPH: Record<number, string> = { [-2]: "𝄫", [-1]: "♭", 0: "♮", 1: "♯", 2: "𝄪" };
 // sharps order F C G D A E B · flats order B E A D G C F, as letter indices
 const SHARP_LETTERS = [3, 0, 4, 1, 5, 2, 6];
 const FLAT_LETTERS = [6, 2, 5, 1, 4, 0, 3];

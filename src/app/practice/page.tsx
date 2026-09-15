@@ -7,10 +7,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Keybed, type KeyState } from "../../components/Keybed";
 import {
-  atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, keyNameOf, relativeOf, sigSpelling, subsumedBy, PC_NAMES,
+  atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, keyNameOf, knowledgeAnswerable, relativeOf, sigSpelling, subsumedBy, PC_NAMES,
   type ArpAtom, type ChordAtom, type DrillAtom, type KeysAtom, type ReadingAtom, type ScaleAtom,
 } from "../../core/catalog";
-import { sampleReading, spellSounding, LETTERS, type ReadingInstance } from "../../core/reading";
+import { sampleReading, spellSounding, ACC_GLYPH, LETTERS, type ReadingInstance } from "../../core/reading";
 import { gradeSingleNote } from "../../core/grader/note";
 import { StaffView } from "../../components/StaffView";
 import { NoteSelector } from "../../components/NoteSelector";
@@ -58,11 +58,7 @@ function poolFor(f: Family): DrillAtom[] {
 /** Knowledge-only mode (08 §7 — a filter, not a mode): with no MIDI device the filler
  *  offers only choice-answerable atoms; identical scheduling, identical evidence. */
 function deviceFiltered(pool: DrillAtom[], hasDevice: boolean): DrillAtom[] {
-  if (hasDevice) return pool;
-  return pool.filter(a =>
-    a.family === "keys" ||
-    (a.family === "chord" && a.answer === "spell") ||
-    (a.family === "reading" && a.answer === "selector"));
+  return hasDevice ? pool : pool.filter(knowledgeAnswerable);
 }
 
 /** A template block's serving pool (08 §5): its areas' pools, weakest-first via the filler. */
@@ -263,7 +259,8 @@ export default function Practice() {
   const enterInterstitial = useCallback((idx: number) => {
     const st = S.current;
     const blocks = st.template!.blocks;
-    while (idx < blocks.length && poolForBlock(blocks[idx]).length === 0) idx++;
+    // a block with nothing servable HERE — empty, or at-instrument-only with no device — skips (08 §4/§7)
+    while (idx < blocks.length && deviceFiltered(poolForBlock(blocks[idx]), st.hasDevice).length === 0) idx++;
     if (idx >= blocks.length) {
       ui.chime();
       setPhase("done");
@@ -890,7 +887,8 @@ export default function Practice() {
               {phase === "teach" && (
                 <p className="max-w-72 text-[14px] text-[var(--ink2)]">
                   {isKeys ? `${feedback} — tap the highlighted answer`
-                    : isReading ? `${feedback} — ${isReadSel ? "name it" : "play it"}`
+                    : isReadSel && inst ? `${feedback} — tap ${LETTERS[inst.letter]}${inst.eff !== 0 ? `, then ${ACC_GLYPH[inst.eff]}` : ""}, then ${inst.octave} (the octave tap answers)`
+                    : isReading ? `${feedback} — play it`
                     : isSpell ? `${feedback} — tap them, any octave`
                     : isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}
                 </p>

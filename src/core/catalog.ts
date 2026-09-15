@@ -223,6 +223,14 @@ export function sigSpelling(sig: number): string {
   return src.slice(0, Math.abs(sig)).join(" · ");
 }
 
+/** Knowledge-only mode's filter (08 §7): can this atom be answered without an instrument?
+ *  The filler AND the map both apply it — choice-answerable material only. */
+export function knowledgeAnswerable(a: DrillAtom): boolean {
+  return a.family === "keys"
+    || (a.family === "chord" && a.answer === "spell")
+    || (a.family === "reading" && a.answer === "selector");
+}
+
 /** The prompt title, per family — plain words, never model nouns (hub rule). */
 export function atomTitle(a: DrillAtom): string {
   if (a.family === "keys") return keyNameOf(a.sig, a.mode);
