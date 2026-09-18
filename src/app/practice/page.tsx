@@ -17,6 +17,7 @@ import { sampleReading, spellSounding, type ReadingInstance } from "../../core/r
 import { gradeSingleNote } from "../../core/grader/note";
 import { StaffView } from "../../components/StaffView";
 import { NoteSelector } from "../../components/NoteSelector";
+import { SpellChips } from "../../components/SpellChips";
 import { Sig } from "../../components/Sig";
 import { KeyWheel, SigGrid, type PickState } from "../../components/KeysWidgets";
 import { gradeChoice, gradeSpellTaps } from "../../core/grader/choice";
@@ -132,6 +133,10 @@ export default function Practice() {
   const atomRef = useRef<DrillAtom | null>(null);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { atomRef.current = atom; }, [atom]);
+
+  /** F4 spell lights CHIPS, not keys — the state map is pc-keyed (F4 §Variants). */
+  const spellPcStates = (a: ChordAtom, state: KeyState): Record<number, KeyState> =>
+    Object.fromEntries(chordPcs(a).map(pc => [pc, state]));
 
   const expectedKeyStates = useCallback((a: DrillAtom, state: KeyState): Record<number, KeyState> => {
     const out: Record<number, KeyState> = {};
@@ -273,7 +278,8 @@ export default function Practice() {
     if (isSpellAtom(res.atom)) {
       st.spellTaps = [];
       if (res.kind === "teach") {
-        const base = expectedKeyStates(res.atom, "exp");
+        // choice-shape teach (U2 §Teach): tones named + chips revealed; a tap continues
+        const base = spellPcStates(res.atom, "exp");
         st.baseKeys = base;
         setKeys(base);
         setFeedback(chordPcs(res.atom).map(pc => PC_NAMES[pc]).join(" · "));
@@ -584,7 +590,7 @@ export default function Practice() {
   }, [advance, expectedKeyStates, logAttempt]);
 
   /** F4 spell (F4 §Variants: "tap its notes", octave-free): grade the tap stream. */
-  const finalizeSpell = useCallback((a: ChordAtom, wrongMidi?: number) => {
+  const finalizeSpell = useCallback((a: ChordAtom, wrongPc?: number) => {
     const st = S.current;
     const res = gradeSpellTaps(
       { pcs: chordPcs(a), symbol: chordSymbol(a), windowMs: KNOWLEDGE_WINDOW_MS, promptAtMs: st.promptAt },
@@ -603,7 +609,7 @@ export default function Practice() {
     if (res.rating === 1) {
       ui.err();
       st.reconcileMatched = new Set();
-      const base = { ...expectedKeyStates(a, "exp"), ...(wrongMidi !== undefined ? { [wrongMidi]: "err" as KeyState } : {}) };
+      const base = { ...spellPcStates(a, "exp"), ...(wrongPc !== undefined ? { [wrongPc]: "err" as KeyState } : {}) };
       st.baseKeys = base;
       setKeys(base);
       setFeedback(`Expected ${chordSymbol(a)} — ${tones}`);
@@ -616,7 +622,8 @@ export default function Practice() {
     advance(1000);
   }, [advance, expectedKeyStates, logAttempt]);
 
-  /** Spell input — a screen tap or a played key, the same answer (octave-free recall). */
+  /** Spell input — a chip tap or a played key, the same answer (octave-free recall).
+   *  Chip state is pc-keyed; a played key folds to its pc. */
   const spellInput = useCallback((midi: number) => {
     const a = atomRef.current;
     const st = S.current;
@@ -625,12 +632,14 @@ export default function Practice() {
     const pc = ((midi % 12) + 12) % 12 as Pc;
     const want = new Set(chordPcs(a));
     if (ph === "teach" || ph === "reconcile") {
+      // screen taps ack the teach via the zone (U2 §Teach); this path is played keys +
+      // reconcile chips — walking the revealed tones continues (the reconciliation rule)
       if (!want.has(pc)) {
-        if (ph === "reconcile") { setKeys({ ...expectedKeyStates(a, "exp"), [midi]: "err" }); st.reconcileMatched = new Set(); }
+        if (ph === "reconcile") { setKeys({ ...spellPcStates(a, "exp"), [pc]: "err" }); st.reconcileMatched = new Set(); }
         return;
       }
       st.reconcileMatched.add(pc);
-      setKeys(k => ({ ...k, [midi]: "ok" }));
+      setKeys(k => ({ ...k, [pc]: "ok" }));
       if (st.reconcileMatched.size >= want.size) {
         if (ph === "teach") {
           const taught = afterTeach(st.card!);
@@ -645,15 +654,15 @@ export default function Practice() {
     st.spellTaps.push({ midi, atMs: performance.now() });
     if (want.has(pc)) {
       st.matched.add(pc);
-      setKeys(k => ({ ...k, [midi]: "ok" }));
+      setKeys(k => ({ ...k, [pc]: "ok" }));
       if (st.matched.size >= want.size) { st.finalized = true; finalizeSpell(a); }
     } else {
       st.finalized = true;
-      setKeys(k => ({ ...k, [midi]: "err" }));
-      finalizeSpell(a, midi);
+      setKeys(k => ({ ...k, [pc]: "err" }));
+      finalizeSpell(a, pc);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [advance, expectedKeyStates, finalizeSpell]);
+  }, [advance, finalizeSpell]);
 
   /** Widget taps (F1): the answer path for choice atoms — commit on tap (03 §3). */
   const handlePick = useCallback((sig: number) => {
@@ -1007,8 +1016,9 @@ export default function Practice() {
   const isReadSel = isReading && (atom as ReadingAtom).answer === "selector";
   const isInterval = atom !== null && isIntervalAtom(atom);
   const isIvSel = isInterval && (atom as IntervalAtom).answer === "selector";
-  // choice-answer teach: named result, inert widget, any tap continues (U2 §Teach)
-  const choiceTeach = phase === "teach" && (isKeys || isReadSel || isIvSel);
+  // choice-answer teach: named result, inert widget, any tap continues (U2 §Teach) —
+  // played keys may still walk the revealed tones instead (spell's at-instrument ack)
+  const choiceTeach = phase === "teach" && (isKeys || isReadSel || isIvSel || isSpell);
   const tpl = S.current.template;
   const tplBlock = tpl ? tpl.blocks[blockIdxView] : null;
   const subParts = atom === null ? null
@@ -1066,7 +1076,6 @@ export default function Practice() {
                   {choiceTeach ? <>{feedback} · <span className="text-[var(--accent-hi)]">tap to continue</span></>
                     : isReading ? `${feedback} — play it`
                     : isInterval ? feedback
-                    : isSpell ? `${feedback} — tap them, any octave`
                     : isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}
                 </p>
               )}
@@ -1136,9 +1145,10 @@ export default function Practice() {
               ) : isIvSel && ivInst ? (
                 <IntervalSelector onCommit={handleIntervalPick}
                   reveal={phase === "teach" || phase === "reconcile" ? { size: ivInst.size, quality: ivInst.quality } : null} />
+              ) : isSpell ? (
+                <SpellChips states={keys} onTap={spellInput} />
               ) : atom === null && (family === "keys" || tpl !== null) ? null : (
-                <Keybed states={keys} labels={phase === "teach" && labels ? labels : undefined}
-                  onKeyTap={isSpell ? spellInput : undefined} />
+                <Keybed states={keys} labels={phase === "teach" && labels ? labels : undefined} />
               )}
             </div>
           </div>

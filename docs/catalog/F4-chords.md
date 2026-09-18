@@ -29,7 +29,7 @@
 | `staff→midi` | Engraved chord → play it — trains stack-reading; a separate atom from name-cue. **Exact octave** — the staff names registers |
 | `staff→choice` | Engraved chord → identify **root + quality + inversion** on full-option rows (root: 12 chips, black keys dual-labeled C♯/D♭; quality: the scoped set; inversion: all). Distractor-free per the widget principle. **Clef is identity** — treble and bass engravings are separate atoms (02 §2) |
 | `name→engraving` | Chord symbol → pick the correct engraving from a small grid of candidate staves. Inherently distractor-based (candidates: other inversions of the same chord, neighbor qualities, accidental traps) — the sanctioned exception to the widget principle, because the option space is unbounded. Clef-blind: candidates render in treble |
-| `name→choice` (spelling) | "F♯dim7 → tap its notes" on the on-screen keyboard — spelling recall, knowledge-only mode, octave-free |
+| `name→choice` (spelling) | "F♯dim7 → tap its notes" on the **twelve pitch-class chips** — the same full-option chip row `staff→choice` uses, black keys dual-labeled (C♯/D♭). Taps accumulate octave-free and the answer commits at the chord's tone count, a wrong tone failing on the spot; **played keys spell too at the instrument** — the same recall either way. Knowledge-only mode |
 
 ## Tier ladder (execution only)
 
