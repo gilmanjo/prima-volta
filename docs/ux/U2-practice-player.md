@@ -27,7 +27,10 @@ Answer → instant verdict. Correct = green LED sweep + latency chip (Spline Mon
 
 ## Teach states (ungraded, rehearsal context — always)
 
-New-material introduction: the fingering path on the keybed, name + engraving side by side, a neutral **Teach** chip, "Play it once" → converts to the first graded rep. No timer, no grade — and never inside a performance flow.
+New-material introduction: a neutral **Teach** chip, no timer, no grade — and never inside a performance flow. Two shapes, by answer kind:
+
+- **Play answers:** the fingering path on the keybed, name + engraving side by side, "Play it once" → converts to the first graded rep.
+- **Choice answers** (the widget roster): the teach **names the result** — the prompt with its answer stated plainly ("m2 — a minor second" · "D5"), the widget's reveal lighting where that answer lives — and **a tap continues** (the copy says so; the widget is inert, so any tap in the answer zone continues). It never scripts the interaction — "tap D, then 5" and kin are out: the first graded rep is where the user answers for themselves.
 
 ## Steps, transitions, polishing
 

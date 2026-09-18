@@ -49,8 +49,19 @@ export interface ReadingAtom extends CatalogAtom {
   answer: "midi" | "selector";
 }
 
+export interface IntervalAtom extends CatalogAtom {
+  family: "interval";
+  kind: string;                       // m2 … P8, TT (the tritone is one atom; spelling samples)
+  dir: "up" | "down" | null;          // identity; null on harmonic staff pairs (stacked, log #65)
+  form: "melodic" | "harmonic";
+  cue: "name" | "staff";
+  clef: "treble" | "bass" | "grand" | null;
+  hand: "RH" | "LH" | null;
+  answer: "midi" | "selector";
+}
+
 /** The playable-atom union the filler and player serve. */
-export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom | KeysAtom | ReadingAtom;
+export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom | KeysAtom | ReadingAtom | IntervalAtom;
 
 const atoms = (catalogJson as { atoms: CatalogAtom[] }).atoms;
 const byId = new Map(atoms.map(a => [a.id, a]));
@@ -125,6 +136,21 @@ export function readingAdmissionKey(a: ReadingAtom): number[] {
   return [stage, ctx, acc, band, clef, a.answer === "selector" ? 1 : 0];
 }
 
+const KIND_ORDER = ["m2", "M2", "m3", "M3", "P4", "TT", "P5", "m6", "M6", "m7", "M7", "P8"];
+
+/** Admission key for F3 atoms: kind order × form (harmonic = T3, after melodic) × cue ×
+ *  answer × direction × hand. Anchors are instance variety, not admission (F3 §Grading). */
+export function intervalAdmissionKey(a: IntervalAtom): number[] {
+  return [
+    KIND_ORDER.indexOf(a.kind),
+    a.form === "harmonic" ? 1 : 0,
+    a.cue === "staff" ? 1 : 0,
+    a.answer === "selector" ? 1 : 0,
+    a.dir === "down" ? 1 : 0,
+    a.hand === "LH" ? 1 : 0,
+  ];
+}
+
 const FAMILY_ORDER: Record<string, number> = { keys: 0, chord: 1, scale: 2, arp: 3, reading: 4, interval: 5 };
 
 function admissionKey(a: DrillAtom): number[] {
@@ -133,6 +159,7 @@ function admissionKey(a: DrillAtom): number[] {
   if (a.family === "scale") return [fam, ...scaleAdmissionKey(a)];
   if (a.family === "arp") return [fam, ...arpAdmissionKey(a)];
   if (a.family === "reading") return [fam, ...readingAdmissionKey(a)];
+  if (a.family === "interval") return [fam, ...intervalAdmissionKey(a)];
   return [fam, ...chordAdmissionKey(a)];
 }
 
@@ -151,6 +178,7 @@ export function identityOf(a: DrillAtom): { root: unknown; quality: unknown } {
   if (a.family === "scale") return { root: a.key, quality: a.type };
   if (a.family === "arp") return { root: a.root, quality: a.basis };
   if (a.family === "reading") return { root: a.band, quality: `${a.keyContext}·${a.accidental}` };
+  if (a.family === "interval") return { root: a.kind, quality: a.form };
   return { root: a.root, quality: a.quality };
 }
 
@@ -228,7 +256,8 @@ export function sigSpelling(sig: number): string {
 export function knowledgeAnswerable(a: DrillAtom): boolean {
   return a.family === "keys"
     || (a.family === "chord" && a.answer === "spell")
-    || (a.family === "reading" && a.answer === "selector");
+    || (a.family === "reading" && a.answer === "selector")
+    || (a.family === "interval" && a.answer === "selector");
 }
 
 /** The prompt title, per family — plain words, never model nouns (hub rule). */
@@ -237,6 +266,7 @@ export function atomTitle(a: DrillAtom): string {
   if (a.family === "scale") return `${PC_NAMES[a.key]} ${SCALE_LABEL[a.type]}`;
   if (a.family === "arp") return `${PC_NAMES[a.root]} ${ARP_LABEL[a.basis]} arpeggio`;
   if (a.family === "reading") return "Read the note"; // the engraving IS the prompt
+  if (a.family === "interval") return a.kind === "TT" ? "the tritone" : a.kind; // the page shows the instance's label
   return chordSymbol(a);
 }
 

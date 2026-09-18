@@ -20,6 +20,10 @@ export const BOUT_IDLE_MS = 20 * 60_000;   // 08 §6 — the idle clock is the o
 export const READ_LEARN_WINDOW_MS = 5000;
 export const READ_GATE_WINDOW_MS = 900;
 
+// F3: the gate widens the ANCHOR POOL, not the clock (02 §1's instance-pool demand);
+// one generous latency window until T4's speeded tier arrives.
+export const INTERVAL_WINDOW_MS = 5000;
+
 // Practice-local steps (04 §2) — item-denominated with a clock fallback.
 export const CONFIRM_AFTER_ITEMS = 20;
 export const CONFIRM_AFTER_MS = 10 * 60_000;
