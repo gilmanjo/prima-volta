@@ -12,6 +12,11 @@ export const TRAILING_GRACE_MS = 500;      // 03 §7 — release flourishes afte
 export const CHORD_LEARN_WINDOW_MS = 5000;
 export const CHORD_GATE_WINDOW_MS = 900;
 export const KNOWLEDGE_WINDOW_MS = 5000;   // F1 §Grading — one generous window, never tightens
+// 03 §6: a multi-tap knowledge answer (F4 spell) widens the window per additional tone —
+// the window covers every tap, not just the first (bench, log #94).
+export const SPELL_TONE_MS = 1500;
+export const spellWindowMs = (tones: number): number =>
+  KNOWLEDGE_WINDOW_MS + SPELL_TONE_MS * Math.max(0, tones - 1);
 
 export const BOUT_IDLE_MS = 20 * 60_000;   // 08 §6 — the idle clock is the only closer
 

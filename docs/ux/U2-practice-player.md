@@ -21,7 +21,8 @@ Answer → instant verdict. Correct = green LED sweep + latency chip (Spline Mon
 - **Metronome dots are the beats of the bar** (two for 6/8, three for 3/4, four for 4/4), current beat lit — never a decorative strip of pips.
 - The keybed carries **no note-name labels** during drills. Teach states show **fingering numerals on the path dots** (sourced, never invented) — the sequence of a scale is obvious and isn't numbered.
 - The **metronome strip exists only when the item is pulsed** — a free-tempo drill shows none.
-- The latency chip shows **milliseconds after an answer, never status words** ("paused", "reconcile" and kin are banned).
+- The latency chip shows **milliseconds after an answer, never status words** ("paused", "reconcile" and kin are banned) — and wherever a window decides Hard vs Good it reads **actual over budget** ("4.2s / 7.4s"), so slow is never a mystery (03 §6).
+- **F4 spell at the instrument:** played keys answer and the subtext says so ("play or tap · any octave"); its teach continues by playing the revealed tones as well as by the tap.
 - The keybed keeps **piano-like key proportions in every orientation**: its height follows its width, so portrait never renders toothpick keys — landscape remains the designed home.
 - **A correct key's green lives with the note**: it lights on the press and fades away on the release — never a static stain. A wrong key's red mark stays until the next serve.
 

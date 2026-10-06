@@ -1,7 +1,7 @@
 // Pulsed-run laws (03 §4 windowed matcher · 03 §6 pulsed map · F5/F6 run shapes), pinned —
 // with the personas that would notice them regressing (13's feature-ships-with-its-persona law).
 import { describe, it, expect } from "vitest";
-import { buildRun, runTempo, selfPacedRunResult } from "../src/core/runs";
+import { anchorOffset, buildRun, runTempo, selfPacedRunResult } from "../src/core/runs";
 import { gradePulsedRun, gridWindowMs, type PulsedRunSpec } from "../src/core/grader/pulsed";
 import { afterTeach, applyRep, newCard } from "../src/core/scheduler";
 import type { ArpAtom, ScaleAtom } from "../src/core/catalog";
@@ -27,6 +27,20 @@ describe("run shapes (F5/F6 — up-down, apex once)", () => {
     const r = buildRun(scale());
     expect(r.slots.map(s => s.midis[0])).toEqual([60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67, 65, 64, 62, 60]);
     expect(r.slots.filter(s => s.midis[0] === 72).length).toBe(1);
+  });
+
+  it("name-cue register freedom (03 §7): the first tonic-pc note fixes the octave offset", () => {
+    // Jordan's pathology: LH B♭ major anchored at B♭2 (46) — the home position is B♭3 (58)
+    const r = buildRun(scale({ key: 10, hand: "LH" }));
+    expect(r.slots[0].midis).toEqual([58]);
+    expect(anchorOffset(r.slots[0], 46)).toBe(-12);  // B♭2 — one octave below home
+    expect(anchorOffset(r.slots[0], 58)).toBe(0);    // home itself
+    expect(anchorOffset(r.slots[0], 70)).toBe(12);   // an octave above
+    expect(anchorOffset(r.slots[0], 47)).toBeNull(); // B natural — the false start it always was
+    // HT: one offset shared by both hands, anchored to the NEAREST home member
+    const ht = buildRun(scale({ key: 10, hand: "HT" }));
+    expect(ht.slots[0].midis).toEqual([58, 70]);
+    expect(anchorOffset(ht.slots[0], 46)).toBe(-12); // nearest member is LH's 58, not RH's 70
   });
 
   it("A melodic minor ascends melodic and descends the natural form (the standard exercise)", () => {

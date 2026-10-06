@@ -88,6 +88,30 @@ describe("pair grading (F3 §Grading)", () => {
     expect(apart.rating).toBe(1);
     expect(apart.errorEvents[0].type).toBe("dropChordTone");
   });
+
+  it("chatter law (03 §7): an anchor retrigger is never the second note (bench, log #94)", () => {
+    // Jordan's pathology — descending from C4, the hand rolls over the held anchor and the
+    // triple-sensor action retriggers it before the target lands
+    const down = { anchorMidi: 60, targetMidi: 57, form: "melodic" as const, windowMs: 5000, spreadMs: 105, promptAtMs: 1000 };
+    const g = gradeIntervalPair(down, [n(60, 2000), n(60, 2300), n(57, 2700)]);
+    expect(g.rating).toBe(3);
+    expect(g.latencyMs).toBe(1700); // the answer pair's second onset — chatter never inflates it
+    // a retrigger AFTER the pair is equally ignored
+    expect(gradeIntervalPair(down, [n(60, 2000), n(57, 2600), n(57, 2700)]).rating).toBe(3);
+    // but a genuinely different wrong second note still fails
+    expect(gradeIntervalPair(down, [n(60, 2000), n(59, 2600)]).rating).toBe(1);
+  });
+
+  it("harmonic chatter never shrinks the measured spread (distinct keys' first onsets)", () => {
+    const h = { ...spec, form: "harmonic" as const };
+    // anchor at 2000, its chatter at 2050, target late at 2400 → the grab was 400ms apart
+    // (naive adjacent-onset spread would have read the 50ms chatter gap and passed it)
+    const g = gradeIntervalPair(h, [n(67, 2000), n(67, 2050), n(76, 2400)]);
+    expect(g.rating).toBe(1);
+    expect(g.errorEvents[0].type).toBe("dropChordTone");
+    // chatter on a clean grab stays clean
+    expect(gradeIntervalPair(h, [n(67, 2000), n(76, 2050), n(67, 2200)]).rating).toBe(3);
+  });
 });
 
 describe("admission (kind order × form × cue — anchors are never admission)", () => {

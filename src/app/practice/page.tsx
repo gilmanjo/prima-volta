@@ -24,11 +24,11 @@ import { gradeChoice, gradeSpellTaps } from "../../core/grader/choice";
 import { next as fillerNext, noteServed, type FillerState } from "../../core/filler";
 import { gradeDiscreteChord } from "../../core/grader/discrete";
 import { runLabels } from "../../core/fingering";
-import { buildRun, runTempo, selfPacedRunResult, type Run } from "../../core/runs";
+import { anchorOffset, buildRun, runTempo, selfPacedRunResult, type Run } from "../../core/runs";
 import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from "../../core/scheduler";
 import { ulid } from "../../core/ulid";
 import type { GradeResult, NoteEvent, Pc } from "../../core/types";
-import { CHORD_SPREAD_MS, INTERVAL_WINDOW_MS, KNOWLEDGE_WINDOW_MS, READ_GATE_WINDOW_MS, READ_LEARN_WINDOW_MS } from "../../core/constants";
+import { CHORD_SPREAD_MS, INTERVAL_WINDOW_MS, KNOWLEDGE_WINDOW_MS, READ_GATE_WINDOW_MS, READ_LEARN_WINDOW_MS, spellWindowMs } from "../../core/constants";
 import { STARTER_TEMPLATE, type PracticeTemplate, type TemplateBlock } from "../../core/template";
 import { defaultProfile, initMidi, onNote, onNoteOff } from "../../services/midi";
 import { ensureAudio, ui } from "../../services/uiAudio";
@@ -114,7 +114,7 @@ export default function Practice() {
     reconcileMatched: Set<number>; sinceSync: number; finalized: boolean; retryTimer: number | null;
     reconcileArmedAt: number; reconcileBuf: { midi: number; onMs: number }[];
     spellTaps: { midi: number; atMs: number }[];
-    run: Run | null; runNoteMs: number; runPos: number; runSlotHit: Set<number>; runOnsets: number[];
+    run: Run | null; runNoteMs: number; runPos: number; runSlotHit: Set<number>; runOnsets: number[]; runOffset: number;
     teachSlot: number; teachHit: Set<number>; baseKeys: Record<number, KeyState>;
     readingInst: ReadingInstance | null; readingSeed: number; hasDevice: boolean;
     ivInst: IntervalInstance | null; ivSeed: number;
@@ -124,7 +124,7 @@ export default function Practice() {
     template: null, blockIdx: 0, blockStartMs: 0, blockServed: 0, interTimer: null,
     card: null, promptAt: 0, collected: [], matched: new Set(), reconcileMatched: new Set(),
     sinceSync: 0, finalized: false, retryTimer: null, reconcileArmedAt: 0, reconcileBuf: [], spellTaps: [],
-    run: null, runNoteMs: 1000, runPos: 0, runSlotHit: new Set(), runOnsets: [], teachSlot: 0, teachHit: new Set(), baseKeys: {},
+    run: null, runNoteMs: 1000, runPos: 0, runSlotHit: new Set(), runOnsets: [], runOffset: 0, teachSlot: 0, teachHit: new Set(), baseKeys: {},
     readingInst: null, readingSeed: 0, hasDevice: false,
     ivInst: null, ivSeed: 0,
   });
@@ -246,7 +246,7 @@ export default function Practice() {
         // name-cue runs are SELF-PACED (03 §6, log #87): the tier anchor demands pace,
         // not entrainment — the pulse arrives with cue types that can engrave a note value
         st.runNoteMs = runTempo(res.card.tier).noteMs;
-        st.runPos = 0; st.runSlotHit = new Set(); st.runOnsets = [];
+        st.runPos = 0; st.runSlotHit = new Set(); st.runOnsets = []; st.runOffset = 0;
         setPhase("prompt");
       }
       return;
@@ -386,7 +386,7 @@ export default function Practice() {
       return;
     }
     if (res.rating === 3) ui.good(); else ui.hard();
-    setFeedback(`${inst.spelled} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setFeedback(`${inst.spelled} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(windowMs / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
     setPhase("good");
     advance(850);
   }, [advance, logAttempt]);
@@ -421,7 +421,7 @@ export default function Practice() {
       return;
     }
     if (res.rating === 3) ui.good(); else ui.hard();
-    setFeedback(`${iv.label} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setFeedback(`${iv.label} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(INTERVAL_WINDOW_MS / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
     setPhase("good");
     advance(850);
   }, [advance, logAttempt]);
@@ -473,7 +473,7 @@ export default function Practice() {
       return;
     }
     if (res.rating === 3) ui.good(); else ui.hard();
-    setFeedback(`${iv.label} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setFeedback(`${iv.label} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(KNOWLEDGE_WINDOW_MS / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
     setPhase("good");
     advance(1000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -511,7 +511,7 @@ export default function Practice() {
       return;
     }
     if (res.rating === 3) ui.good(); else ui.hard();
-    setFeedback(`${inst.spelled} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setFeedback(`${inst.spelled} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(KNOWLEDGE_WINDOW_MS / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
     setPhase("good");
     advance(1000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -562,7 +562,7 @@ export default function Practice() {
       ? selfPacedRunResult(st.runOnsets, st.runNoteMs)
       : {
           rating: 1, latencyMs: null, clean: false, inWindow: false,
-          errorEvents: [{ type: "substitution", playedMidi: wrongMidi, expectedMidi: run.slots[st.runPos]?.midis[0], tags: [] }],
+          errorEvents: [{ type: "substitution", playedMidi: wrongMidi, expectedMidi: run.slots[st.runPos] ? run.slots[st.runPos].midis[0] + st.runOffset : undefined, tags: [] }],
         };
     const attemptId = ulid();
     const nowMs = Date.now();
@@ -576,7 +576,9 @@ export default function Practice() {
     if (result.rating === 1) {
       ui.err();
       st.teachSlot = 0; st.teachHit = new Set(); // the remediation walk starts from the bottom
-      const base = { ...expectedKeyStates(a, "exp"), ...(wrongMidi !== undefined ? { [wrongMidi]: "err" as KeyState } : {}) };
+      // the path lights at the register the attempt anchored (03 §7's offset)
+      const base: Record<number, KeyState> = Object.fromEntries(run.pathMidis.map(m => [m + st.runOffset, "exp" as KeyState]));
+      if (wrongMidi !== undefined) base[wrongMidi] = "err";
       st.baseKeys = base;
       setKeys(base);
       setFeedback(`Expected ${atomTitle(a)} — up and down`);
@@ -584,7 +586,7 @@ export default function Practice() {
       return;
     }
     if (result.rating === 3) ui.good(); else ui.hard();
-    setFeedback(`${atomTitle(a)} · ${result.latencyMs} ms per note · ${result.rating === 3 ? "Good" : "Hard"}`);
+    setFeedback(`${atomTitle(a)} · ${result.latencyMs} / ${st.runNoteMs} ms per note · ${result.rating === 3 ? "Good" : "Hard"}`);
     setPhase("good");
     advance(850);
   }, [advance, expectedKeyStates, logAttempt]);
@@ -592,8 +594,10 @@ export default function Practice() {
   /** F4 spell (F4 §Variants: "tap its notes", octave-free): grade the tap stream. */
   const finalizeSpell = useCallback((a: ChordAtom, wrongPc?: number) => {
     const st = S.current;
+    // 03 §6: a multi-tap answer widens the window per additional tone
+    const windowMs = spellWindowMs(chordPcs(a).length);
     const res = gradeSpellTaps(
-      { pcs: chordPcs(a), symbol: chordSymbol(a), windowMs: KNOWLEDGE_WINDOW_MS, promptAtMs: st.promptAt },
+      { pcs: chordPcs(a), symbol: chordSymbol(a), windowMs, promptAtMs: st.promptAt },
       st.spellTaps,
     );
     const attemptId = ulid();
@@ -617,7 +621,7 @@ export default function Practice() {
       return;
     }
     if (res.rating === 3) ui.good(); else ui.hard();
-    setFeedback(`${chordSymbol(a)} · ${tones} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setFeedback(`${chordSymbol(a)} · ${tones} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(windowMs / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
     setPhase("good");
     advance(1000);
   }, [advance, expectedKeyStates, logAttempt]);
@@ -703,7 +707,7 @@ export default function Practice() {
     }
     if (res.rating === 3) ui.good(); else ui.hard();
     setPicks({ [sig]: "correct" });
-    setFeedback(`${keysConfirmation(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setFeedback(`${keysConfirmation(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(KNOWLEDGE_WINDOW_MS / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
     setPhase("good");
     advance(1200); // the confirmation carries the relative pairing — worth a breath more
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -748,6 +752,9 @@ export default function Practice() {
           else setKeys(k => ({ ...k, [n.midi]: "ok" }));
           return;
         }
+        // chatter law (03 §7): a retrigger of the anchor is never the second note —
+        // the pair is two distinct keys by construction (the grader collapses it too)
+        if (n.midi === iv.anchor.midi) return;
         st.finalized = true;
         setKeys(k => ({ ...k, [n.midi]: n.midi === iv.target.midi ? "ok" : "err" }));
         finalizeInterval(a);
@@ -817,11 +824,17 @@ export default function Practice() {
         const run = st.run!;
         const slot = run.slots[st.runPos];
         if (!slot) return;
-        if (slot.midis.includes(n.midi)) {
+        if (st.runPos === 0 && st.runSlotHit.size === 0) {
+          // name-cue register freedom (03 §7): the first tonic-pc note fixes the octave offset
+          const off = anchorOffset(slot, n.midi);
+          if (off !== null) st.runOffset = off;
+        }
+        const slotMidis = slot.midis.map(m => m + st.runOffset);
+        if (slotMidis.includes(n.midi)) {
           if (st.runSlotHit.has(n.midi)) return; // retrigger of a held key — chatter
           st.runSlotHit.add(n.midi);
           setKeys(k => ({ ...k, [n.midi]: "ok" }));
-          if (st.runSlotHit.size >= slot.midis.length) {
+          if (st.runSlotHit.size >= slotMidis.length) {
             st.runOnsets.push(n.onMs);
             st.runPos++;
             st.runSlotHit = new Set();
@@ -831,7 +844,7 @@ export default function Practice() {
         }
         // a re-strike of the just-completed slot within a beat's breath is bounce, not a wrong note
         const prev = st.runPos > 0 ? run.slots[st.runPos - 1] : null;
-        if (prev && prev.midis.includes(n.midi) && n.onMs - st.runOnsets[st.runOnsets.length - 1] < 200) return;
+        if (prev && prev.midis.some(m => m + st.runOffset === n.midi) && n.onMs - st.runOnsets[st.runOnsets.length - 1] < 200) return;
         st.finalized = true;
         ui.err();
         setKeys(k => ({ ...k, [n.midi]: "err" }));
@@ -839,10 +852,11 @@ export default function Practice() {
         return;
       }
       if (ph === "reconcile") {
-        // remediation = walk the lit path from the top, self-paced and ungraded (U2, log #88)
+        // remediation = walk the lit path from the top, self-paced and ungraded (U2, log #88) —
+        // lit at the register the attempt anchored (the offset survives into the walk)
         const run = st.run!;
         const slot = run.slots[st.teachSlot];
-        if (!slot || !slot.midis.includes(n.midi) || st.teachHit.has(n.midi)) return;
+        if (!slot || !slot.midis.some(m => m + st.runOffset === n.midi) || st.teachHit.has(n.midi)) return;
         st.teachHit.add(n.midi);
         setKeys(k => ({ ...k, [n.midi]: "ok" }));
         if (st.teachHit.size >= slot.midis.length) {
@@ -897,6 +911,7 @@ export default function Practice() {
       setKeys(k => ({ ...k, [n.midi]: "ok" }));
       if (st.matched.size >= need) {
         st.finalized = true; // exactly one grade per serve (log #74's double-finalize)
+        const budgetMs = windowFor(st.card!); // the window this rep grades against (pre-rep tier)
         void finalize(a).then(res => {
           if (res.rating === 1) {
             ui.err();
@@ -905,7 +920,7 @@ export default function Practice() {
             return;
           }
           if (res.rating === 3) ui.good(); else ui.hard();
-          setFeedback(`${chordSymbol(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+          setFeedback(`${chordSymbol(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(budgetMs / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
           setPhase("good");
           advance(850);
         });
@@ -1027,7 +1042,7 @@ export default function Practice() {
     : isIntervalAtom(atom) ? (atom.cue === "name"
         ? [`from ${ivInst ? spellNoteName(ivInst.anchor) : "…"}`, `${atom.hand}${atom.form === "harmonic" ? " · together" : ""}`]
         : [`${atom.clef} clef`, atom.answer === "midi" ? "play it" : "name it"])
-    : isSpellAtom(atom) ? ["spell it", "any octave"]
+    : isSpellAtom(atom) ? ["spell it", device ? "play or tap · any octave" : "any octave"]
     : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave · up and down" : "up and down"]
     : [atom.hand as string, atom.form as string];
 
@@ -1073,7 +1088,7 @@ export default function Practice() {
               {phase === "teach" && (
                 <p className={`max-w-72 text-[14px] text-[var(--ink2)] ${choiceTeach ? "cursor-pointer" : ""}`}
                   onClick={choiceTeach ? teachAck : undefined}>
-                  {choiceTeach ? <>{feedback} · <span className="text-[var(--accent-hi)]">tap to continue</span></>
+                  {choiceTeach ? <>{feedback} · <span className="text-[var(--accent-hi)]">{isSpell && device ? "play them — or tap to continue" : "tap to continue"}</span></>
                     : isReading ? `${feedback} — play it`
                     : isInterval ? feedback
                     : isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}

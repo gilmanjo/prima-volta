@@ -15,11 +15,14 @@ export interface IntervalSpec {
 
 export function gradeIntervalPair(spec: IntervalSpec, notes: NoteEvent[]): GradeResult {
   const errors: GradeResult["errorEvents"] = [];
-  const sorted = [...notes].sort((a, b) => a.onMs - b.onMs);
-  const last = sorted[sorted.length - 1];
-  const latencyMs = last ? Math.round(last.onMs - spec.promptAtMs) : null;
+  // chatter law (03 §7): a repeat of the still-current key is never an answer event —
+  // consecutive same-key onsets collapse before matching (the pair is two distinct keys)
+  const sorted = [...notes].sort((a, b) => a.onMs - b.onMs)
+    .filter((n, i, xs) => i === 0 || n.midi !== xs[i - 1].midi);
 
   if (spec.form === "melodic") {
+    const last = sorted[Math.min(sorted.length, 2) - 1];
+    const latencyMs = last ? Math.round(last.onMs - spec.promptAtMs) : null;
     // order enforced: anchor first, target second
     if (sorted[0]?.midi !== spec.anchorMidi) {
       errors.push({ type: "substitution", expectedMidi: spec.anchorMidi, playedMidi: sorted[0]?.midi, tags: ["order"] });
@@ -27,17 +30,26 @@ export function gradeIntervalPair(spec: IntervalSpec, notes: NoteEvent[]): Grade
       const samePc = sorted[1] !== undefined && ((sorted[1].midi - spec.targetMidi) % 12 + 12) % 12 === 0;
       errors.push({ type: samePc ? "wrongOctave" : "substitution", expectedMidi: spec.targetMidi, playedMidi: sorted[1]?.midi, tags: [] });
     }
-  } else {
-    const want = new Set([spec.anchorMidi, spec.targetMidi]);
-    const got = new Set(sorted.map(n => n.midi));
-    for (const m of want) if (!got.has(m)) errors.push({ type: "deletion", expectedMidi: m, tags: [] });
-    for (const n of sorted) if (!want.has(n.midi)) errors.push({ type: "substitution", playedMidi: n.midi, tags: [] });
-    if (!errors.length && sorted.length >= 2 && sorted[1].onMs - sorted[0].onMs > spec.spreadMs) {
-      errors.push({ type: "dropChordTone", tags: [] }); // not together — the grab is the skill
-    }
+    const clean = errors.length === 0 && sorted.length >= 2;
+    if (!clean && errors.length === 0) errors.push({ type: "deletion", expectedMidi: spec.targetMidi, tags: [] });
+    const inWindow = clean && latencyMs !== null && latencyMs <= spec.windowMs;
+    return { rating: !clean ? 1 : inWindow ? 3 : 2, latencyMs, errorEvents: errors, clean, inWindow };
   }
-  const clean = errors.length === 0 && sorted.length >= 2;
-  if (!clean && errors.length === 0) errors.push({ type: "deletion", expectedMidi: spec.targetMidi, tags: [] });
+
+  // harmonic — the grab: per-key FIRST onsets, so chatter never shrinks the measured spread
+  const firstOn = new Map<number, number>();
+  for (const n of sorted) if (!firstOn.has(n.midi)) firstOn.set(n.midi, n.onMs);
+  const want = new Set([spec.anchorMidi, spec.targetMidi]);
+  for (const m of want) if (!firstOn.has(m)) errors.push({ type: "deletion", expectedMidi: m, tags: [] });
+  for (const m of firstOn.keys()) if (!want.has(m)) errors.push({ type: "substitution", playedMidi: m, tags: [] });
+  if (!errors.length) {
+    const spread = Math.abs(firstOn.get(spec.anchorMidi)! - firstOn.get(spec.targetMidi)!);
+    if (spread > spec.spreadMs) errors.push({ type: "dropChordTone", tags: [] }); // not together — the grab is the skill
+  }
+  const clean = errors.length === 0;
+  const latencyMs = clean
+    ? Math.round(Math.max(firstOn.get(spec.anchorMidi)!, firstOn.get(spec.targetMidi)!) - spec.promptAtMs)
+    : sorted.length ? Math.round(sorted[sorted.length - 1].onMs - spec.promptAtMs) : null;
   const inWindow = clean && latencyMs !== null && latencyMs <= spec.windowMs;
   return { rating: !clean ? 1 : inWindow ? 3 : 2, latencyMs, errorEvents: errors, clean, inWindow };
 }

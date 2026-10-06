@@ -1,6 +1,7 @@
 // F4 spell laws (F4 §Variants: "tap its notes", octave-free, inversion-blind — log #39).
 import { describe, it, expect } from "vitest";
 import { gradeSpellTaps } from "../src/core/grader/choice";
+import { KNOWLEDGE_WINDOW_MS, spellWindowMs } from "../src/core/constants";
 
 const spec = { pcs: [8, 0, 3, 7], symbol: "A♭maj7", windowMs: 5000, promptAtMs: 1000 };
 const tap = (midi: number, atMs: number) => ({ midi, atMs });
@@ -27,5 +28,15 @@ describe("spell (F4 knowledge)", () => {
     const g = gradeSpellTaps(spec, [tap(68, 3000), tap(60, 4000), tap(63, 5000), tap(67, 6500)]);
     expect(g.rating).toBe(2);
     expect(g.clean).toBe(true);
+  });
+
+  it("the window widens per additional tone (03 §6: it covers every tap — bench, log #94)", () => {
+    expect(spellWindowMs(1)).toBe(KNOWLEDGE_WINDOW_MS);
+    expect(spellWindowMs(3)).toBe(KNOWLEDGE_WINDOW_MS + 3000); // triad: 8s
+    expect(spellWindowMs(4)).toBe(KNOWLEDGE_WINDOW_MS + 4500); // seventh: 9.5s
+    // Jordan's pathology: a careful seventh spelled in ~7.5s was rating Hard under the flat 5s
+    const g = gradeSpellTaps({ ...spec, windowMs: spellWindowMs(4) },
+      [tap(68, 3000), tap(60, 4500), tap(63, 6000), tap(67, 8400)]);
+    expect(g.rating).toBe(3);
   });
 });

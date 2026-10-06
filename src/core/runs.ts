@@ -54,6 +54,19 @@ export function selfPacedRunResult(slotOnsetsMs: number[], noteBudgetMs: number)
   return { rating: inWindow ? 3 : 2, latencyMs, clean: true, inWindow, errorEvents: [] };
 }
 
+/** Name-cue register freedom (03 §7: bare pitch-class symbols stay any-octave): the first
+ *  tonic-pc note fixes the OCTAVE OFFSET — nearest the home position, one offset shared by
+ *  both hands — and the whole path grades relative. Null = not the tonic's pc (false start). */
+export function anchorOffset(firstSlot: RunSlot, midi: number): number | null {
+  let best: number | null = null;
+  for (const m of firstSlot.midis) {
+    if (((midi - m) % 12 + 12) % 12 !== 0) continue;
+    const off = midi - m;
+    if (best === null || Math.abs(off) < Math.abs(best)) best = off;
+  }
+  return best;
+}
+
 export function buildRun(a: ScaleAtom | ArpAtom): Run {
   let rhSeq: number[];
   if (a.family === "scale") {
