@@ -10,6 +10,7 @@ export interface ChordAtom extends CatalogAtom {
   hand?: "RH" | "LH" | "HT";
   form?: "blocked" | "broken";
   cue?: "name" | "staff";
+  clef?: "treble" | "bass";    // the id arm's identity axis (02 §2)
   answer: "midi" | "id" | "engraving" | "spell";
   stream?: boolean;
 }
@@ -252,6 +253,51 @@ export function chordPcs(a: ChordAtom): Pc[] {
   return rotated.map(iv => (((a.root + iv) % 12) as Pc));
 }
 
+// chord-tone letter offsets from the root (stack spelling: 3rd +2 letters · 5th +4 · 7th +6)
+const Q_LETTER_STEPS: Record<string, number[]> = {
+  maj: [0, 2, 4], min: [0, 2, 4], dim: [0, 2, 4], aug: [0, 2, 4],
+  maj7: [0, 2, 4, 6], dom7: [0, 2, 4, 6], m7: [0, 2, 4, 6], m7b5: [0, 2, 4, 6], dim7: [0, 2, 4, 6],
+};
+// canonical root spellings, matching PC_NAMES' choices (pc → [letter, inline])
+const ROOT_SPELLING: [number, number][] =
+  [[0, 0], [0, 1], [1, 0], [2, -1], [2, 0], [3, 0], [3, 1], [4, 0], [5, -1], [5, 0], [6, -1], [6, 0]];
+
+export interface ChordStaffNote { letter: number; octave: number; inline: number | null; midi: number; }
+
+/** The canonical home voicing, spelled for the staff (F4 §Variants staff→midi): bass-first
+ *  by inversion, stacked upward from the clef's home register — EXACTLY the midis the teach
+ *  lights (the same stack arithmetic), so engraving, lighting and grading are one fact. */
+export function chordStaffNotes(a: Pick<ChordAtom, "root" | "quality" | "inversion">, clef: "treble" | "bass"): ChordStaffNote[] {
+  const inv = a.inversion ?? 0;
+  const ivs = Q_INTERVALS[a.quality];
+  const steps = Q_LETTER_STEPS[a.quality];
+  const order = [...ivs.keys()].map(i => (i + inv) % ivs.length); // tone indices, bass first
+  const base = clef === "treble" ? 60 : 48;
+  const [rootLetter] = ROOT_SPELLING[a.root];
+  let prev = base - 1;
+  return order.map(ti => {
+    const pc = ((a.root + ivs[ti]) % 12) as Pc;
+    let midi = base + ((pc - (base % 12) + 12) % 12);
+    while (midi <= prev) midi += 12;
+    prev = midi;
+    const letter = (rootLetter + steps[ti]) % 7;
+    let octave = Math.floor(midi / 12) - 1;
+    let inline = midi - (12 * (octave + 1) + LETTER_PC_CHORD[letter]);
+    if (inline > 2) { octave++; inline -= 12; }
+    else if (inline < -2) { octave--; inline += 12; }
+    return { letter, octave, inline: inline === 0 ? null : inline, midi };
+  });
+}
+
+const LETTER_PC_CHORD = [0, 2, 4, 5, 7, 9, 11];
+
+/** The major key's signature for a tonic pc (the circle: +1 per fifth), in −5…6. */
+export function majorSigOf(pc: Pc): number {
+  let s = (pc * 7) % 12;
+  if (s > 6) s -= 12;
+  return s;
+}
+
 /** Lead-sheet symbol, slash bass for inversions — one continuous run (log #57/#58). */
 export function chordSymbol(a: ChordAtom): string {
   const root = PC_NAMES[a.root];
@@ -298,7 +344,7 @@ export function sigSpelling(sig: number): string {
  *  The filler AND the map both apply it — choice-answerable material only. */
 export function knowledgeAnswerable(a: DrillAtom): boolean {
   return a.family === "keys"
-    || (a.family === "chord" && a.answer === "spell")
+    || (a.family === "chord" && a.answer !== "midi") // spell · identify · engraving-pick (F4's tierless knowledge arms)
     || (a.family === "reading" && a.answer === "selector")
     || (a.family === "interval" && a.answer === "selector");
 }

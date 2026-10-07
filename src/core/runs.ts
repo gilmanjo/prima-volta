@@ -67,6 +67,21 @@ export function anchorOffset(firstSlot: RunSlot, midi: number): number | null {
   return best;
 }
 
+/** The pulsed run's register freedom (03 §7: a key signature names no register): the first
+ *  tonic-pc note near beat zero fixes the octave offset the whole grid shifts by. */
+export function pulsedOffset(slots: RunSlot[], notes: { midi: number; onMs: number }[], t0Ms: number, noteMs: number): number {
+  const m0 = slots[0]?.midis[0];
+  if (m0 === undefined) return 0;
+  const reach = Math.max(noteMs / 2, 250);
+  let best = 0, bestD = Infinity;
+  for (const n of notes) {
+    if (((n.midi - m0) % 12 + 12) % 12 !== 0) continue;
+    const d = Math.abs(n.onMs - t0Ms);
+    if (d <= reach && d < bestD) { bestD = d; best = n.midi - m0; }
+  }
+  return best;
+}
+
 export function buildRun(a: ScaleAtom | ArpAtom): Run {
   let rhSeq: number[];
   if (a.family === "scale") {

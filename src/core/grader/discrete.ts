@@ -9,6 +9,47 @@
 import { CHORD_SPREAD_MS, TRAILING_GRACE_MS } from "../constants";
 import type { ErrorEvent, GradeResult, GradedAttempt, NoteEvent, Pc } from "../types";
 
+export interface StaffChordSpec {
+  midis: number[];           // the engraved voicing, exact registers (03 §7: the staff names them)
+  windowMs: number;
+  spreadMs: number;          // the attack window — base + the profile's jitter
+  promptAtMs: number;
+}
+
+/** F4 staff→midi (F4 §Variants): the engraved stack, EXACT keys — one simultaneous attack.
+ *  wrongOctave is its own diagnosis (the register IS what the staff teaches); chatter
+ *  collapses per 03 §7; the spread measures the distinct expected keys' first onsets. */
+export function gradeStaffChord(spec: StaffChordSpec, notesIn: NoteEvent[]): GradeResult {
+  const seq = [...notesIn].sort((a, b) => a.onMs - b.onMs)
+    .filter((n, i, xs) => i === 0 || n.midi !== xs[i - 1].midi);
+  const want = new Set(spec.midis);
+  const errors: ErrorEvent[] = [];
+  const firstOn = new Map<number, number>();
+  for (const n of seq) {
+    if (firstOn.has(n.midi)) continue;
+    firstOn.set(n.midi, n.onMs);
+    if (!want.has(n.midi)) {
+      const samePc = spec.midis.some(m => ((n.midi - m) % 12 + 12) % 12 === 0);
+      const exp = samePc ? spec.midis.find(m => ((n.midi - m) % 12 + 12) % 12 === 0) : undefined;
+      errors.push({ type: samePc ? "wrongOctave" : "substitution", expectedMidi: exp, playedMidi: n.midi, tags: [] });
+    }
+  }
+  for (const m of spec.midis) if (!firstOn.has(m)) errors.push({ type: "deletion", expectedMidi: m, tags: [] });
+  const pitchClean = errors.length === 0;
+  if (pitchClean) {
+    const ons = spec.midis.map(m => firstOn.get(m)!);
+    if (Math.max(...ons) - Math.min(...ons) > spec.spreadMs) {
+      errors.push({ type: "dropChordTone", tags: [] }); // right keys, not together (03 §4)
+    }
+  }
+  const clean = errors.length === 0;
+  const latencyMs = clean
+    ? Math.round(Math.max(...spec.midis.map(m => firstOn.get(m)!)) - spec.promptAtMs)
+    : seq.length ? Math.round(seq[seq.length - 1].onMs - spec.promptAtMs) : null;
+  const inWindow = clean && latencyMs !== null && latencyMs <= spec.windowMs;
+  return { rating: !clean ? 1 : inWindow ? 3 : 2, latencyMs, errorEvents: errors, clean, inWindow };
+}
+
 export interface DiscreteChordSpec {
   pcs: Pc[];                 // expected pitch classes (name-cue), bass first for inversions
   hand: "RH" | "LH" | "HT";  // HT = the same pc set in each hand

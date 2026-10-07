@@ -7,11 +7,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Keybed, type KeyState } from "../../components/Keybed";
 import {
-  atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, keyNameOf, knowledgeAnswerable, relativeOf, sigSpelling, subsumedBy, tierMaxOf, PC_NAMES,
-  type ArpAtom, type ChordAtom, type DrillAtom, type FlashAtom, type IntervalAtom, type KeysAtom, type ReadingAtom, type ScaleAtom, type TopoAtom,
+  atomTitle, catalog, chordPcs, chordStaffNotes, chordSymbol, compareAdmission, keyNameOf, knowledgeAnswerable, majorSigOf, relativeOf, sigSpelling, subsumedBy, tierMaxOf, PC_NAMES,
+  type ArpAtom, type ChordAtom, type ChordStaffNote, type DrillAtom, type FlashAtom, type IntervalAtom, type KeysAtom, type ReadingAtom, type ScaleAtom, type TopoAtom,
 } from "../../core/catalog";
 import { sampleTopoStream, type TopoStream, type TopoTarget } from "../../core/topo";
 import { evalTopoPrompt, summarizeTopoStream } from "../../core/grader/topo";
+import { sampleEngravingPick, type EngravingPickInstance } from "../../core/engravingPick";
+import { ChordIdSelector } from "../../components/ChordIdSelector";
+import { EngravingGrid } from "../../components/EngravingGrid";
+import { gradePulsedRun, gridWindowMs } from "../../core/grader/pulsed";
+import { startRunClock, type RunClock } from "../../services/metronome";
 import { intervalWords, sampleInterval, spellNoteName, staffSpec, type IntervalInstance } from "../../core/intervals";
 import { gradeIntervalPair } from "../../core/grader/interval";
 import { deriveInstanceSeed, flashDisplayMs, sampleFlash, type FlashInstance } from "../../core/flash";
@@ -26,9 +31,9 @@ import { Sig } from "../../components/Sig";
 import { KeyWheel, SigGrid, type PickState } from "../../components/KeysWidgets";
 import { gradeChoice, gradeSpellTaps } from "../../core/grader/choice";
 import { next as fillerNext, noteServed, type FillerState } from "../../core/filler";
-import { gradeDiscreteChord } from "../../core/grader/discrete";
+import { gradeDiscreteChord, gradeStaffChord } from "../../core/grader/discrete";
 import { runLabels } from "../../core/fingering";
-import { anchorOffset, buildRun, runTempo, selfPacedRunResult, type Run } from "../../core/runs";
+import { anchorOffset, buildRun, pulsedOffset, runTempo, selfPacedRunResult, type Run } from "../../core/runs";
 import { afterTeach, applyDerived, applyRep, gateRepPending, windowFor, type DrillCard } from "../../core/scheduler";
 import { ulid } from "../../core/ulid";
 import type { GradeResult, NoteEvent, Pc } from "../../core/types";
@@ -49,15 +54,19 @@ const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never b
 type Family = "chord" | "scale" | "arp" | "keys" | "reading" | "interval" | "flash" | "topo" | "free";
 const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures", reading: "Note reading", interval: "Intervals", flash: "Staff flash", topo: "Topography", free: "Free roam" };
 
+// midi arms: blocked only (broken's order+evenness grading is still ahead), and staff-cue
+// waits on the grand staff for HT. Knowledge arms (spell · id · engraving) all serve.
 const CHORD_POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
-  .filter(a => !a.stream && (a.answer === "midi" ? a.cue === "name" && a.form === "blocked" : a.answer === "spell"))
+  .filter(a => !a.stream && (a.answer === "midi"
+    ? a.form === "blocked" && (a.cue === "name" || a.hand !== "HT")
+    : true))
   .sort(compareAdmission);
 
 function poolFor(f: Family): DrillAtom[] {
   if (f === "keys")
     return (catalog.defaults("keys") as KeysAtom[]).sort(compareAdmission);
-  if (f === "scale") // keysig cue is engraved — staff territory, still ahead
-    return (catalog.defaults("scale") as ScaleAtom[]).filter(a => a.cue === "name").sort(compareAdmission);
+  if (f === "scale") // both cues serve: name self-paced, keysig pulsed (03 §6)
+    return (catalog.defaults("scale") as ScaleAtom[]).sort(compareAdmission);
   if (f === "arp") // alternating is the T6 capstone — its handoff grading comes later
     return (catalog.defaults("arp") as ArpAtom[]).filter(a => a.hand !== "alternating").sort(compareAdmission);
   if (f === "reading")
@@ -95,6 +104,14 @@ const isReadingAtom = (a: DrillAtom): a is ReadingAtom => a.family === "reading"
 const isIntervalAtom = (a: DrillAtom): a is IntervalAtom => a.family === "interval";
 const isFlashAtom = (a: DrillAtom): a is FlashAtom => a.family === "flash";
 const isTopoAtom = (a: DrillAtom): a is TopoAtom => a.family === "topo";
+const isStaffChordAtom = (a: DrillAtom): a is ChordAtom & { answer: "midi"; cue: "staff" } =>
+  a.family === "chord" && a.answer === "midi" && a.cue === "staff";
+const isChordIdAtom = (a: DrillAtom): a is ChordAtom & { answer: "id" } =>
+  a.family === "chord" && a.answer === "id";
+const isEngravingAtom = (a: DrillAtom): a is ChordAtom & { answer: "engraving" } =>
+  a.family === "chord" && a.answer === "engraving";
+const isKeysigRunAtom = (a: DrillAtom): a is ScaleAtom & { cue: "keysig" } =>
+  a.family === "scale" && a.cue === "keysig";
 
 /** Confirmation copy (F1 §Variants): sig→key reveals the relative pairing (and the ±6
  *  enharmonic); key→sig spells the accidentals in order. */
@@ -121,6 +138,9 @@ export default function Practice() {
   const [flInst, setFlInst] = useState<FlashInstance | null>(null);
   const [flashProg, setFlashProg] = useState<[number, number] | null>(null); // instance/target i/N in the strip
   const [topoView, setTopoView] = useState<{ cur: TopoTarget; next: TopoTarget | null } | null>(null);
+  const [chordStaff, setChordStaff] = useState<ChordStaffNote[] | null>(null);
+  const [engCells, setEngCells] = useState<EngravingPickInstance["cells"] | null>(null);
+  const [beat, setBeat] = useState<[number, boolean] | null>(null); // [beat-in-bar, isCountIn] — the pulse strip
   const [verdictBad, setVerdictBad] = useState(false); // a non-blocking Again verdict reads felt-red
   const [doubles, setDoubles] = useState(false);
 
@@ -139,6 +159,8 @@ export default function Practice() {
     flashInst: FlashInstance | null; flashRepSeed: number; flashI: number; flashCount: number;
     flashResults: GradeResult[]; flashBlankAt: number; flashPos: number; flashTimer: number | null; flashNoteStart: number;
     topoStream: TopoStream | null; topoIdx: number; topoBufStart: number; topoPromptAt: number; topoLats: number[]; topoSeed: number;
+    staffChordMidis: number[]; engSeed: number; engCorrect: string;
+    pulse: RunClock | null; pulseTimer: number | null;
   }>({
     filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, pool: CHORD_POOL, served: 0,
     profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
@@ -150,6 +172,8 @@ export default function Practice() {
     ivInst: null, ivSeed: 0,
     flashInst: null, flashRepSeed: 0, flashI: 0, flashCount: FLASH_N, flashResults: [], flashBlankAt: 0, flashPos: 0, flashTimer: null, flashNoteStart: 0,
     topoStream: null, topoIdx: 0, topoBufStart: 0, topoPromptAt: 0, topoLats: [], topoSeed: 0,
+    staffChordMidis: [], engSeed: 0, engCorrect: "correct",
+    pulse: null, pulseTimer: null,
   });
 
   const phaseRef = useRef<Phase>("init");
@@ -183,6 +207,8 @@ export default function Practice() {
 
   // F8's machine is reached from serve() (declared before its parts) through a stable ref
   const flashM = useRef<{ begin: () => void; finish: () => void }>({ begin: () => {}, finish: () => {} });
+  // F5's pulsed finalize rides the same pattern — the clock's timer fires it
+  const pulseM = useRef<{ finish: () => void }>({ finish: () => {} });
 
   const serve = useCallback(() => {
     const st = S.current;
@@ -219,8 +245,13 @@ export default function Practice() {
     setFlInst(null);
     setFlashProg(null);
     setTopoView(null);
+    setChordStaff(null);
+    setEngCells(null);
+    setBeat(null);
     setVerdictBad(false);
     if (st.flashTimer !== null) { clearTimeout(st.flashTimer); st.flashTimer = null; }
+    if (st.pulseTimer !== null) { clearTimeout(st.pulseTimer); st.pulseTimer = null; }
+    if (st.pulse) { st.pulse.stop(); st.pulse = null; }
     if (isTopoAtom(res.atom)) {
       // engine-A sampled stream (F9 §Mechanics): random spawn = the cold find, seed logged
       st.topoSeed = Math.floor(Math.random() * 2 ** 31);
@@ -307,6 +338,49 @@ export default function Practice() {
       }
       return;
     }
+    if (isStaffChordAtom(res.atom)) {
+      // F4 staff→midi: the canonical home voicing, engraved — exact keys (03 §7)
+      const clef = res.atom.hand === "LH" ? "bass" : "treble";
+      const voicing = chordStaffNotes(res.atom, clef);
+      st.staffChordMidis = voicing.map(v => v.midi);
+      setChordStaff(voicing);
+      if (res.kind === "teach") {
+        st.teachHit = new Set();
+        const base: Record<number, KeyState> = Object.fromEntries(st.staffChordMidis.map(m => [m, "exp" as KeyState]));
+        st.baseKeys = base;
+        setKeys(base);
+        setPhase("teach");
+      } else {
+        st.baseKeys = {};
+        setPhase("prompt");
+      }
+      return;
+    }
+    if (isChordIdAtom(res.atom)) {
+      // F4 staff→choice: the engraved stack named on three full-option rows
+      setChordStaff(chordStaffNotes(res.atom, res.atom.clef ?? "treble"));
+      if (res.kind === "teach") {
+        setFeedback(`${chordSymbol(res.atom)} — ${chordPcs(res.atom).map(pc => PC_NAMES[pc]).join(" · ")}`);
+        setPhase("teach");
+      } else {
+        setPhase("prompt");
+      }
+      return;
+    }
+    if (isEngravingAtom(res.atom)) {
+      // F4 name→engraving: seeded candidate grid (the sanctioned distractor exception)
+      st.engSeed = Math.floor(Math.random() * 2 ** 31);
+      const pick = sampleEngravingPick(res.atom, st.engSeed);
+      st.engCorrect = pick.correctId;
+      setEngCells(pick.cells);
+      if (res.kind === "teach") {
+        setFeedback(`${chordSymbol(res.atom)} — ${chordPcs(res.atom).map(pc => PC_NAMES[pc]).join(" · ")}`);
+        setPhase("teach");
+      } else {
+        setPhase("prompt");
+      }
+      return;
+    }
     if (isRunAtom(res.atom)) {
       st.run = buildRun(res.atom);
       if (res.kind === "teach") {
@@ -316,6 +390,24 @@ export default function Practice() {
         setKeys(base);
         setLabels(runLabels(res.atom)); // sourced fingering numerals — or nothing (U2, log #81)
         setPhase("teach");
+      } else if (isKeysigRunAtom(res.atom)) {
+        // F5 keysig→midi — THE PULSE RETURNS (03 §6: notation can specify it): count-in,
+        // then the grid; the take runs to the clock's end and grades as one (the pulsed map)
+        const tempo = runTempo(res.card.tier);
+        st.runNoteMs = tempo.noteMs;
+        st.runPos = 0; st.runSlotHit = new Set(); st.runOnsets = []; st.runOffset = 0;
+        const gridMs = st.run.slots.length * tempo.noteMs;
+        st.pulse = startRunClock({
+          beatMs: tempo.beatMs,
+          runBeats: Math.ceil(gridMs / tempo.beatMs),
+          onBeat: (b, cIn) => setBeat([b, cIn]),
+        });
+        const windowMs = gridWindowMs(tempo.noteMs, st.profileJitterMs);
+        st.pulseTimer = window.setTimeout(
+          () => pulseM.current.finish(),
+          st.pulse.endMs - performance.now() + tempo.noteMs / 2 + windowMs + 250,
+        );
+        setPhase("prompt");
       } else {
         // name-cue runs are SELF-PACED (03 §6, log #87): the tier anchor demands pace,
         // not entrainment — the pulse arrives with cue types that can engrave a note value
@@ -527,6 +619,160 @@ export default function Practice() {
 
   flashM.current.begin = beginFlashInstance;
   flashM.current.finish = finishFlashInstance;
+
+  /** F4 staff→midi: the engraved voicing, exact keys, one attack (F4 §Variants/03 §4). */
+  const finalizeStaffChord = useCallback((a: ChordAtom) => {
+    const st = S.current;
+    const res = gradeStaffChord({
+      midis: st.staffChordMidis, windowMs: windowFor(st.card!),
+      spreadMs: CHORD_SPREAD_MS + st.profileJitterMs, promptAtMs: st.promptAt,
+    }, st.collected);
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    const { card: after, row } = applyRep(st.card!, res, attemptId, { servedCount: st.served, nowMs });
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs, { rating: res.rating, latencyMs: res.latencyMs, errors: res.errorEvents.length });
+    void appendReview({ id: ulid(), ...row });
+    if (res.rating === 1) {
+      ui.err();
+      st.reconcileBuf = [];
+      st.reconcileArmedAt = performance.now() + RECONCILE_ARM_MS;
+      const base: Record<number, KeyState> = Object.fromEntries(st.staffChordMidis.map(m => [m, "exp" as KeyState]));
+      for (const e of res.errorEvents) if (e.playedMidi !== undefined) base[e.playedMidi] = "err";
+      st.baseKeys = base;
+      setKeys(base);
+      const timingOnly = res.errorEvents.length > 0 && res.errorEvents.every(e => e.type === "dropChordTone");
+      setFeedback(timingOnly ? "Right keys, not together" : `Expected ${chordSymbol(a)} — as written`);
+      setPhase("reconcile");
+      return;
+    }
+    if (res.rating === 3) ui.good(); else ui.hard();
+    const budget = windowFor(st.card!);
+    setFeedback(`${chordSymbol(a)} · as written · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(budget / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setPhase("good");
+    advance(850);
+  }, [advance, logAttempt]);
+
+  /** F4 staff→choice: root + quality + inversion, one symbolic commit (knowledge). */
+  const handleIdPick = useCallback((sym: { root: number; quality: string; inversion: number }) => {
+    const a = atomRef.current;
+    const st = S.current;
+    const ph = phaseRef.current;
+    if (!a || !isChordIdAtom(a)) return;
+    const expectedSym = `${a.root}|${a.quality}|${a.inversion ?? 0}`;
+    const pickedSym = `${sym.root}|${sym.quality}|${sym.inversion}`;
+    if (ph === "reconcile") {
+      if (pickedSym === expectedSym) { ui.good(); advance(250); }
+      return;
+    }
+    if (ph !== "prompt" || st.finalized) return;
+    st.finalized = true;
+    const commitAt = performance.now();
+    // a three-tap answer: the knowledge window widens per tap (03 §6)
+    const res = gradeChoice({ expectedSym, windowMs: spellWindowMs(3), promptAtMs: st.promptAt }, pickedSym, commitAt);
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    const { card: after, row } = applyRep(st.card!, res, attemptId, { servedCount: st.served, nowMs }, false, null, false);
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs, { rating: res.rating, latencyMs: res.latencyMs, errors: res.errorEvents.length },
+      { expectedSym, tapped: [{ sym: pickedSym, atMs: Math.round(commitAt - st.promptAt) }] });
+    void appendReview({ id: ulid(), ...row });
+    if (res.rating === 1) {
+      ui.err();
+      setFeedback(`Expected ${chordSymbol(a)}`);
+      setPhase("reconcile");
+      return;
+    }
+    if (res.rating === 3) ui.good(); else ui.hard();
+    setFeedback(`${chordSymbol(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(spellWindowMs(3) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setPhase("good");
+    advance(1000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advance, logAttempt]);
+
+  /** F4 name→engraving: one tap on the candidate grid (knowledge; the seed re-renders it). */
+  const handleEngPick = useCallback((cellId: string) => {
+    const a = atomRef.current;
+    const st = S.current;
+    const ph = phaseRef.current;
+    if (!a || !isEngravingAtom(a)) return;
+    if (ph === "reconcile") {
+      if (cellId === st.engCorrect) { ui.good(); advance(250); }
+      return;
+    }
+    if (ph !== "prompt" || st.finalized) return;
+    st.finalized = true;
+    const commitAt = performance.now();
+    const res = gradeChoice({ expectedSym: st.engCorrect, windowMs: KNOWLEDGE_WINDOW_MS, promptAtMs: st.promptAt }, cellId, commitAt);
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    const { card: after, row } = applyRep(st.card!, res, attemptId, { servedCount: st.served, nowMs }, false, null, false);
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs, { rating: res.rating, latencyMs: res.latencyMs, errors: res.errorEvents.length },
+      { expectedSym: st.engCorrect, tapped: [{ sym: cellId, atMs: Math.round(commitAt - st.promptAt) }] }, String(st.engSeed));
+    void appendReview({ id: ulid(), ...row, instanceSeed: String(st.engSeed) });
+    if (res.rating === 1) {
+      ui.err();
+      setFeedback(`That one is not ${chordSymbol(a)}`);
+      setPhase("reconcile");
+      return;
+    }
+    if (res.rating === 3) ui.good(); else ui.hard();
+    setFeedback(`${chordSymbol(a)} · ${((res.latencyMs ?? 0) / 1000).toFixed(1)}s / ${(KNOWLEDGE_WINDOW_MS / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setPhase("good");
+    advance(1000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advance, logAttempt]);
+
+  /** F5 keysig→midi finalize: the clock ended — associate, grade on the grid (03 §4/§6). */
+  const finalizeKeysigRun = useCallback(() => {
+    const a = atomRef.current;
+    const st = S.current;
+    if (!a || !isKeysigRunAtom(a) || phaseRef.current !== "prompt" || st.finalized || !st.run || !st.pulse) return;
+    st.finalized = true;
+    const tempo = runTempo(st.card!.tier);
+    // register freedom (03 §7): the first tonic-pc note near beat zero fixes the octave offset
+    const off = pulsedOffset(st.run.slots, st.collected, st.pulse.t0Ms, tempo.noteMs);
+    st.runOffset = off;
+    const slots = off === 0 ? st.run.slots : st.run.slots.map(s => ({ ...s, midis: s.midis.map(m => m + off) }));
+    const windowMs = gridWindowMs(tempo.noteMs, st.profileJitterMs);
+    const outcome = gradePulsedRun(
+      { slots, t0Ms: st.pulse.t0Ms, noteMs: tempo.noteMs, windowMs, promptAtMs: st.promptAt },
+      st.collected,
+    );
+    const res = outcome.result;
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    const { card: after, row } = applyRep(st.card!, res, attemptId, { servedCount: st.served, nowMs });
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs, {
+      rating: res.rating, latencyMs: res.latencyMs, errors: res.errorEvents.length,
+      outOfWindow: outcome.outOfWindow, evennessCv: outcome.evennessCv,
+    });
+    void appendReview({ id: ulid(), ...row });
+    setBeat(null);
+    const bpm = Math.round(60000 / tempo.beatMs);
+    if (res.rating === 1) {
+      ui.err();
+      st.teachSlot = 0; st.teachHit = new Set(); // walk the lit path, at the anchored register
+      const base: Record<number, KeyState> = Object.fromEntries(st.run.pathMidis.map(m => [m + off, "exp" as KeyState]));
+      st.baseKeys = base;
+      setKeys(base);
+      setFeedback(`Expected ${atomTitle(a)} — with the click, up and down`);
+      setPhase("reconcile");
+      return;
+    }
+    if (res.rating === 3) ui.good(); else ui.hard();
+    setFeedback(`${atomTitle(a)} · ♩=${bpm} · ${outcome.outOfWindow === 0 ? "on the grid" : "1 onset off the grid"} · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setPhase("good");
+    advance(1000);
+  }, [advance, logAttempt]);
+
+  pulseM.current.finish = finalizeKeysigRun;
 
   /** F9: the stream is one attempt (F9 §Grading) — flawed → Again + reconcile on the
    *  failed target; clean → median per-target latency against the learning budget. */
@@ -918,8 +1164,51 @@ export default function Practice() {
     const st = S.current;
     const ph = phaseRef.current;
     if (!a) return;
-    if (isKeysAtom(a)) return; // choice atoms answer on widgets — the piano is silent here
+    if (isKeysAtom(a) || isChordIdAtom(a) || isEngravingAtom(a)) return; // choice atoms answer on widgets — the piano is silent here
     if (isSpellAtom(a)) { spellInput(n.midi); return; } // a played key spells too — same recall
+    if (isStaffChordAtom(a)) {
+      const want = st.staffChordMidis;
+      if (ph === "teach") {
+        // play the engraved stack once — exact keys (the staff names registers)
+        if (!want.includes(n.midi) || st.teachHit.has(n.midi)) return;
+        st.teachHit.add(n.midi);
+        setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        if (st.teachHit.size >= want.length) {
+          const taught = afterTeach(st.card!);
+          st.filler.cards.set(a.id, taught);
+          void saveCard(taught);
+          advance(300);
+        }
+        return;
+      }
+      if (ph === "reconcile") {
+        // continue by the fresh attack, exact keys together (U2's reconciliation rule)
+        if (performance.now() < st.reconcileArmedAt) return;
+        if (!want.includes(n.midi)) {
+          setKeys({ ...Object.fromEntries(want.map(m => [m, "exp" as KeyState])), [n.midi]: "err" });
+          st.reconcileBuf = [];
+          return;
+        }
+        st.reconcileBuf = st.reconcileBuf.filter(x => n.onMs - x.onMs <= (CHORD_SPREAD_MS + st.profileJitterMs) * 1.5);
+        if (!st.reconcileBuf.some(x => x.midi === n.midi)) st.reconcileBuf.push({ midi: n.midi, onMs: n.onMs });
+        setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        if (st.reconcileBuf.length >= want.length) { ui.good(); advance(250); }
+        return;
+      }
+      if (ph !== "prompt" || st.finalized) return;
+      st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
+      if (!want.includes(n.midi)) {
+        st.finalized = true;
+        setKeys(k => ({ ...k, [n.midi]: "err" }));
+        finalizeStaffChord(a);
+        return;
+      }
+      if (st.matched.has(n.midi)) return; // retrigger of a held key — chatter (03 §7)
+      st.matched.add(n.midi);
+      setKeys(k => ({ ...k, [n.midi]: "ok" }));
+      if (st.matched.size >= want.length) { st.finalized = true; finalizeStaffChord(a); }
+      return;
+    }
     if (isIntervalAtom(a)) {
       if (a.answer !== "midi") return; // the selector variant answers on the widget
       const iv = st.ivInst!;
@@ -1127,6 +1416,16 @@ export default function Practice() {
         }
         return;
       }
+      if (ph === "prompt" && !st.finalized && isKeysigRunAtom(a)) {
+        // pulsed capture (03 §6): the take runs to the clock's end — no mid-take blocking;
+        // lighting is display-only (in the anchored path = ok, else err)
+        st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
+        const run = st.run!;
+        const off = st.collected.length === 1 ? pulsedOffset(run.slots, st.collected, st.pulse?.t0Ms ?? st.promptAt, st.runNoteMs) : st.runOffset;
+        if (st.collected.length === 1) st.runOffset = off;
+        setKeys(k => ({ ...k, [n.midi]: run.pathMidis.some(m => m + off === n.midi) ? "ok" : "err" }));
+        return;
+      }
       if (ph === "prompt" && !st.finalized) {
         // the self-paced walker (03 §6/F5/F6): order-strict; a wrong note stops the flow
         st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
@@ -1332,6 +1631,8 @@ export default function Practice() {
       if (st.retryTimer !== null) clearTimeout(st.retryTimer);
       if (st.interTimer !== null) clearTimeout(st.interTimer);
       if (st.flashTimer !== null) clearTimeout(st.flashTimer);
+      if (st.pulseTimer !== null) clearTimeout(st.pulseTimer);
+      if (st.pulse) st.pulse.stop();
       void pushOutbox();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1346,9 +1647,12 @@ export default function Practice() {
   const isIvSel = isInterval && (atom as IntervalAtom).answer === "selector";
   const isFlash = atom !== null && isFlashAtom(atom);
   const isTopo = atom !== null && isTopoAtom(atom);
+  const isChordId = atom !== null && isChordIdAtom(atom);
+  const isEng = atom !== null && isEngravingAtom(atom);
+  const isStaffChord = atom !== null && isStaffChordAtom(atom);
   // choice-answer teach: named result, inert widget, any tap continues (U2 §Teach) —
   // played keys may still walk the revealed tones instead (spell's at-instrument ack)
-  const choiceTeach = phase === "teach" && (isKeys || isReadSel || isIvSel || isSpell);
+  const choiceTeach = phase === "teach" && (isKeys || isReadSel || isIvSel || isSpell || isChordId || isEng);
   const tpl = S.current.template;
   const tplBlock = tpl ? tpl.blocks[blockIdxView] : null;
   const subParts = atom === null ? null
@@ -1360,6 +1664,10 @@ export default function Practice() {
     : isFlashAtom(atom) ? [`${flInst?.clef ?? "treble"} clef`, phase === "prompt" ? "play it from memory" : "read the figure"]
     : isTopoAtom(atom) ? [atom.hand, "eyes forward — find it by feel"]
     : isSpellAtom(atom) ? ["spell it", device ? "play or tap · any octave" : "any octave"]
+    : isChordIdAtom(atom) ? [`${atom.clef ?? "treble"} clef`, "name it"]
+    : isEngravingAtom(atom) ? ["four engravings", "tap the match"]
+    : isStaffChordAtom(atom) ? [`${atom.hand === "LH" ? "bass" : "treble"} clef`, `${atom.hand} · play it as written`]
+    : isKeysigRunAtom(atom) ? [atom.hand as string, "with the click · 1 octave · up and down"]
     : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave · up and down" : "up and down"]
     : [atom.hand as string, atom.form as string];
 
@@ -1389,6 +1697,11 @@ export default function Practice() {
             <div>
               {isKeysAtom(atom) && atom.dir === "sigToKey"
                 ? <div className="h-28 w-72 max-w-[62vw]"><Sig sig={atom.sig} clef={atom.clef} /></div>
+                : isKeysigRunAtom(atom)
+                ? <div className="h-28 w-72 max-w-[62vw]"><Sig sig={majorSigOf(atom.key)} clef={atom.hand === "LH" ? "bass" : "treble"} /></div>
+                : (isStaffChordAtom(atom) || isChordIdAtom(atom)) && chordStaff
+                ? <div className="h-36 w-80 max-w-[64vw]"><StaffView clef={isChordIdAtom(atom) ? (atom.clef ?? "treble") : atom.hand === "LH" ? "bass" : "treble"}
+                    stream={{ current: chordStaff, next: null }} /></div>
                 : isReadingAtom(atom) && inst
                 ? <div className="h-36 w-80 max-w-[64vw]"><StaffView clef={inst.clef} sig={inst.sig} letter={inst.letter} octave={inst.octave} inline={inst.inline} /></div>
                 : isIntervalAtom(atom) && atom.cue === "staff" && ivInst
@@ -1425,13 +1738,23 @@ export default function Practice() {
               {phase === "flash" && feedback !== "" && (
                 <p className="max-w-72 text-[14px] text-[var(--felt)]">{feedback}</p>
               )}
+              {atom && isKeysigRunAtom(atom) && phase === "prompt" && beat && (
+                <div className="flex items-center gap-2">
+                  {beat[1] && <span className="text-[12px] uppercase tracking-wide text-[var(--ink2)]">count-in</span>}
+                  <div className="flex gap-1.5">
+                    {[0, 1, 2, 3].map(i => (
+                      <i key={i} className={`inline-block h-2 w-2 rounded-full ${beat[0] === i ? (beat[1] ? "bg-[var(--ink2)]" : "bg-[var(--accent-hi)]") : "bg-[var(--border)]"}`} />
+                    ))}
+                  </div>
+                </div>
+              )}
               {phase === "good" && <p className={`text-[14px] ${verdictBad ? "text-[var(--felt)]" : "text-[var(--good)]"}`}>{feedback}</p>}
               {phase === "reconcile" && (
                 <button onClick={() => advance(0)} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-left text-[14px] leading-relaxed text-[var(--ink)]">
                   <span className="text-[var(--felt)]">{feedback}</span>
                   <span className="mt-1 block text-[13px] text-[var(--ink2)]">
-                    {isKeys ? "Tap the right one — or tap here to continue"
-                      : isReadSel || isIvSel ? "Name it — or tap here to continue"
+                    {isKeys || isEng ? "Tap the right one — or tap here to continue"
+                      : isReadSel || isIvSel || isChordId ? "Name it — or tap here to continue"
                       : isInterval ? ((atom as IntervalAtom).form === "harmonic" ? "Grab both together — or tap here to continue" : "Play it, anchor first — or tap here to continue")
                       : isReading ? "Play it — or tap here to continue"
                       : isTopo ? ((atom as TopoAtom).target === "note" ? "Find it — or tap here to continue" : "Grab it together — or tap here to continue")
@@ -1494,6 +1817,13 @@ export default function Practice() {
                   reveal={phase === "teach" || phase === "reconcile" ? { size: ivInst.size, quality: ivInst.quality } : null} />
               ) : isSpell ? (
                 <SpellChips states={keys} onTap={spellInput} />
+              ) : isChordId && atom ? (
+                <ChordIdSelector onCommit={handleIdPick}
+                  reveal={phase === "teach" || phase === "reconcile"
+                    ? { root: (atom as ChordAtom).root, quality: (atom as ChordAtom).quality, inversion: (atom as ChordAtom).inversion ?? 0 } : null} />
+              ) : isEng && engCells ? (
+                <EngravingGrid cells={engCells} onPick={handleEngPick}
+                  reveal={phase === "teach" || phase === "reconcile" ? S.current.engCorrect : null} />
               ) : atom === null && (family === "keys" || tpl !== null) ? null : (
                 <Keybed states={keys} labels={phase === "teach" && labels ? labels : undefined} />
               )}
