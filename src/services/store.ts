@@ -144,8 +144,10 @@ export async function pushOutbox(): Promise<number> {
     bouts: entries.filter(e => e.entry?.kind === "bout").map(e => e.entry!.payload),
     profiles: entries.filter(e => e.entry?.kind === "profile").map(e => e.entry!.payload),
   };
-  const res = await fetch("/api/sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) return 0; // offline or error: outbox simply stays (10 §5)
+  // offline or error: the outbox simply stays (10 §5) — a dead network is normal, never an exception
+  const res = await fetch("/api/sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+    .catch(() => null);
+  if (!res || !res.ok) return 0;
   await Promise.all(keys.map(k => store.del("outbox", k)));
   return keys.length;
 }

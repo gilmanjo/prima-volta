@@ -67,8 +67,16 @@ export interface FlashAtom extends CatalogAtom {
   keyContext: "open" | "ks12" | "ksAll";
 }
 
+export interface TopoAtom extends CatalogAtom {
+  family: "topo";
+  target: "note" | "triad" | "tetrad";
+  span: "inPosition" | "leapOctave" | "leapWide";
+  hand: "RH" | "LH";
+  cue: "name" | "staff";              // staff engraves on the hand's home staff (F9 §Mechanics)
+}
+
 /** The playable-atom union the filler and player serve. */
-export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom | KeysAtom | ReadingAtom | IntervalAtom | FlashAtom;
+export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom | KeysAtom | ReadingAtom | IntervalAtom | FlashAtom | TopoAtom;
 
 const atoms = (catalogJson as { atoms: CatalogAtom[] }).atoms;
 const byId = new Map(atoms.map(a => [a.id, a]));
@@ -171,7 +179,18 @@ export function flashAdmissionKey(a: FlashAtom): number[] {
   ];
 }
 
-const FAMILY_ORDER: Record<string, number> = { keys: 0, chord: 1, scale: 2, arp: 3, reading: 4, interval: 5, flash: 6 };
+/** Admission key for F9 atoms: the tier ladder's order — target slowest (notes sweep their
+ *  spans before the first grab, 05 §2's nesting), then span, cue (name first), hand. */
+export function topoAdmissionKey(a: TopoAtom): number[] {
+  return [
+    a.target === "note" ? 0 : a.target === "triad" ? 1 : 2,
+    a.span === "inPosition" ? 0 : a.span === "leapOctave" ? 1 : 2,
+    a.cue === "name" ? 0 : 1,
+    a.hand === "RH" ? 0 : 1,
+  ];
+}
+
+const FAMILY_ORDER: Record<string, number> = { keys: 0, chord: 1, scale: 2, arp: 3, reading: 4, interval: 5, flash: 6, topo: 7 };
 
 function admissionKey(a: DrillAtom): number[] {
   const fam = FAMILY_ORDER[a.family] ?? 9;
@@ -181,6 +200,7 @@ function admissionKey(a: DrillAtom): number[] {
   if (a.family === "reading") return [fam, ...readingAdmissionKey(a)];
   if (a.family === "interval") return [fam, ...intervalAdmissionKey(a)];
   if (a.family === "flash") return [fam, ...flashAdmissionKey(a)];
+  if (a.family === "topo") return [fam, ...topoAdmissionKey(a)];
   return [fam, ...chordAdmissionKey(a)];
 }
 
@@ -201,6 +221,7 @@ export function identityOf(a: DrillAtom): { root: unknown; quality: unknown } {
   if (a.family === "reading") return { root: a.band, quality: `${a.keyContext}·${a.accidental}` };
   if (a.family === "interval") return { root: a.kind, quality: a.form };
   if (a.family === "flash") return { root: a.pattern, quality: a.keyContext };
+  if (a.family === "topo") return { root: a.target, quality: a.span };
   return { root: a.root, quality: a.quality };
 }
 
@@ -301,6 +322,7 @@ export function atomTitle(a: DrillAtom): string {
   if (a.family === "reading") return "Read the note"; // the engraving IS the prompt
   if (a.family === "interval") return a.kind === "TT" ? "the tritone" : a.kind; // the page shows the instance's label
   if (a.family === "flash") return FLASH_PATTERN_TITLE[a.pattern] ?? a.pattern;
+  if (a.family === "topo") return a.target === "note" ? "find the keys" : a.target === "triad" ? "grab the triads" : "grab the sevenths";
   return chordSymbol(a);
 }
 

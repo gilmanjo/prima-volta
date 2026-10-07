@@ -8,8 +8,10 @@ import Link from "next/link";
 import { Keybed, type KeyState } from "../../components/Keybed";
 import {
   atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, keyNameOf, knowledgeAnswerable, relativeOf, sigSpelling, subsumedBy, tierMaxOf, PC_NAMES,
-  type ArpAtom, type ChordAtom, type DrillAtom, type FlashAtom, type IntervalAtom, type KeysAtom, type ReadingAtom, type ScaleAtom,
+  type ArpAtom, type ChordAtom, type DrillAtom, type FlashAtom, type IntervalAtom, type KeysAtom, type ReadingAtom, type ScaleAtom, type TopoAtom,
 } from "../../core/catalog";
+import { sampleTopoStream, type TopoStream, type TopoTarget } from "../../core/topo";
+import { evalTopoPrompt, summarizeTopoStream } from "../../core/grader/topo";
 import { intervalWords, sampleInterval, spellNoteName, staffSpec, type IntervalInstance } from "../../core/intervals";
 import { gradeIntervalPair } from "../../core/grader/interval";
 import { deriveInstanceSeed, flashDisplayMs, sampleFlash, type FlashInstance } from "../../core/flash";
@@ -33,7 +35,7 @@ import type { GradeResult, NoteEvent, Pc } from "../../core/types";
 import {
   CHORD_SPREAD_MS, FLASH_ANSWER_TIMEOUT_MS, FLASH_ANSWER_WINDOW_MS, FLASH_N, FLASH_N_GATE,
   FLASH_RESHOW_MS, INTERVAL_WINDOW_MS, KNOWLEDGE_WINDOW_MS, READ_GATE_WINDOW_MS,
-  READ_LEARN_WINDOW_MS, spellWindowMs,
+  READ_LEARN_WINDOW_MS, TOPO_BUDGET_MS, spellWindowMs,
 } from "../../core/constants";
 import { STARTER_TEMPLATE, type PracticeTemplate, type TemplateBlock } from "../../core/template";
 import { defaultProfile, initMidi, onNote, onNoteOff } from "../../services/midi";
@@ -44,8 +46,8 @@ import { appendAttempt, appendReview, attachBoutProfile, loadCards, loadProfile,
 type Phase = "init" | "teach" | "flash" | "prompt" | "reconcile" | "good" | "next" | "interstitial" | "done" | "polishing" | "unavailable";
 const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never bleeds in (U2)
 
-type Family = "chord" | "scale" | "arp" | "keys" | "reading" | "interval" | "flash" | "free";
-const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures", reading: "Note reading", interval: "Intervals", flash: "Staff flash", free: "Free roam" };
+type Family = "chord" | "scale" | "arp" | "keys" | "reading" | "interval" | "flash" | "topo" | "free";
+const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures", reading: "Note reading", interval: "Intervals", flash: "Staff flash", topo: "Topography", free: "Free roam" };
 
 const CHORD_POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
   .filter(a => !a.stream && (a.answer === "midi" ? a.cue === "name" && a.form === "blocked" : a.answer === "spell"))
@@ -64,8 +66,10 @@ function poolFor(f: Family): DrillAtom[] {
     return (catalog.defaults("interval") as IntervalAtom[]).sort(compareAdmission);
   if (f === "flash")
     return (catalog.defaults("flash") as FlashAtom[]).sort(compareAdmission);
+  if (f === "topo")
+    return (catalog.defaults("topo") as TopoAtom[]).sort(compareAdmission);
   if (f === "free") // U1's ruled free roam: the weakest-first everything-in-scope mix
-    return [...poolFor("keys"), ...CHORD_POOL, ...poolFor("scale"), ...poolFor("arp"), ...poolFor("reading"), ...poolFor("interval"), ...poolFor("flash")].sort(compareAdmission);
+    return [...poolFor("keys"), ...CHORD_POOL, ...poolFor("scale"), ...poolFor("arp"), ...poolFor("reading"), ...poolFor("interval"), ...poolFor("flash"), ...poolFor("topo")].sort(compareAdmission);
   return CHORD_POOL;
 }
 
@@ -90,6 +94,7 @@ const isSpellAtom = (a: DrillAtom): a is ChordAtom & { answer: "spell" } =>
 const isReadingAtom = (a: DrillAtom): a is ReadingAtom => a.family === "reading";
 const isIntervalAtom = (a: DrillAtom): a is IntervalAtom => a.family === "interval";
 const isFlashAtom = (a: DrillAtom): a is FlashAtom => a.family === "flash";
+const isTopoAtom = (a: DrillAtom): a is TopoAtom => a.family === "topo";
 
 /** Confirmation copy (F1 §Variants): sig→key reveals the relative pairing (and the ±6
  *  enharmonic); key→sig spells the accidentals in order. */
@@ -114,7 +119,8 @@ export default function Practice() {
   const [inst, setInst] = useState<ReadingInstance | null>(null);
   const [ivInst, setIvInst] = useState<IntervalInstance | null>(null);
   const [flInst, setFlInst] = useState<FlashInstance | null>(null);
-  const [flashProg, setFlashProg] = useState<[number, number] | null>(null); // instance i/N in the strip
+  const [flashProg, setFlashProg] = useState<[number, number] | null>(null); // instance/target i/N in the strip
+  const [topoView, setTopoView] = useState<{ cur: TopoTarget; next: TopoTarget | null } | null>(null);
   const [verdictBad, setVerdictBad] = useState(false); // a non-blocking Again verdict reads felt-red
   const [doubles, setDoubles] = useState(false);
 
@@ -132,6 +138,7 @@ export default function Practice() {
     ivInst: IntervalInstance | null; ivSeed: number;
     flashInst: FlashInstance | null; flashRepSeed: number; flashI: number; flashCount: number;
     flashResults: GradeResult[]; flashBlankAt: number; flashPos: number; flashTimer: number | null; flashNoteStart: number;
+    topoStream: TopoStream | null; topoIdx: number; topoBufStart: number; topoPromptAt: number; topoLats: number[]; topoSeed: number;
   }>({
     filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, pool: CHORD_POOL, served: 0,
     profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
@@ -142,6 +149,7 @@ export default function Practice() {
     readingInst: null, readingSeed: 0, hasDevice: false,
     ivInst: null, ivSeed: 0,
     flashInst: null, flashRepSeed: 0, flashI: 0, flashCount: FLASH_N, flashResults: [], flashBlankAt: 0, flashPos: 0, flashTimer: null, flashNoteStart: 0,
+    topoStream: null, topoIdx: 0, topoBufStart: 0, topoPromptAt: 0, topoLats: [], topoSeed: 0,
   });
 
   const phaseRef = useRef<Phase>("init");
@@ -155,7 +163,7 @@ export default function Practice() {
 
   const expectedKeyStates = useCallback((a: DrillAtom, state: KeyState): Record<number, KeyState> => {
     const out: Record<number, KeyState> = {};
-    if (isKeysAtom(a) || isReadingAtom(a) || isIntervalAtom(a) || isFlashAtom(a)) return out; // lit inline or on widgets
+    if (isKeysAtom(a) || isReadingAtom(a) || isIntervalAtom(a) || isFlashAtom(a) || isTopoAtom(a)) return out; // lit inline or on widgets
     if (isRunAtom(a)) {
       for (const m of buildRun(a).pathMidis) out[m] = state;
       return out;
@@ -210,8 +218,30 @@ export default function Practice() {
     setIvInst(null);
     setFlInst(null);
     setFlashProg(null);
+    setTopoView(null);
     setVerdictBad(false);
     if (st.flashTimer !== null) { clearTimeout(st.flashTimer); st.flashTimer = null; }
+    if (isTopoAtom(res.atom)) {
+      // engine-A sampled stream (F9 §Mechanics): random spawn = the cold find, seed logged
+      st.topoSeed = Math.floor(Math.random() * 2 ** 31);
+      st.topoStream = sampleTopoStream(res.atom, res.card.tier, st.topoSeed);
+      st.topoIdx = 0; st.topoBufStart = 0; st.topoLats = [];
+      const t0 = st.topoStream.targets[0];
+      setTopoView({ cur: t0, next: st.topoStream.targets[1] ?? null });
+      if (res.kind === "teach") {
+        st.teachSlot = 0; st.teachHit = new Set();
+        const base: Record<number, KeyState> = Object.fromEntries(t0.midis.map(m => [m, "exp" as KeyState]));
+        st.baseKeys = base;
+        setKeys(base);
+        setPhase("teach");
+      } else {
+        st.baseKeys = {};
+        st.topoPromptAt = performance.now();
+        setFlashProg([1, st.topoStream.targets.length]);
+        setPhase("prompt");
+      }
+      return;
+    }
     if (isFlashAtom(res.atom)) {
       // engine B (04 §5): one rep = N fresh instances off one rep seed; the rep that would
       // complete a gate's earn streak serves five — the perfect-practice bar (F8 §Mechanics)
@@ -497,6 +527,41 @@ export default function Practice() {
 
   flashM.current.begin = beginFlashInstance;
   flashM.current.finish = finishFlashInstance;
+
+  /** F9: the stream is one attempt (F9 §Grading) — flawed → Again + reconcile on the
+   *  failed target; clean → median per-target latency against the learning budget. */
+  const finalizeTopo = useCallback((a: TopoAtom, flaw: { errors: GradeResult["errorEvents"]; timingOnly: boolean } | null) => {
+    const st = S.current;
+    const res = summarizeTopoStream(st.topoLats, flaw?.errors ?? null, TOPO_BUDGET_MS);
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    const { card: after, row } = applyRep(st.card!, res, attemptId, { servedCount: st.served, nowMs });
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs,
+      { rating: res.rating, latencyMs: res.latencyMs, errors: res.errorEvents.length, ...res.stats, targets: st.topoStream!.targets.length, reached: st.topoIdx },
+      undefined, String(st.topoSeed));
+    void appendReview({ id: ulid(), ...row, instanceSeed: String(st.topoSeed) });
+    setFlashProg(null);
+    if (res.rating === 1) {
+      ui.err();
+      const cur = st.topoStream!.targets[st.topoIdx];
+      st.reconcileBuf = [];
+      st.reconcileArmedAt = performance.now() + RECONCILE_ARM_MS;
+      const wrong = flaw?.errors.find(e => e.playedMidi !== undefined)?.playedMidi;
+      const base: Record<number, KeyState> = Object.fromEntries(cur.midis.map(m => [m, "exp" as KeyState]));
+      if (wrong !== undefined) base[wrong] = "err";
+      st.baseKeys = base;
+      setKeys(base);
+      setFeedback(flaw?.timingOnly ? `Right keys, not together — ${cur.label}` : `Expected ${cur.label}`);
+      setPhase("reconcile");
+      return;
+    }
+    if (res.rating === 3) ui.good(); else ui.hard();
+    setFeedback(`${atomTitle(a)} · median ${((res.stats.medianMs ?? 0) / 1000).toFixed(1)}s / ${(TOPO_BUDGET_MS / 1000).toFixed(1)}s · cold ${((res.stats.coldMs ?? 0) / 1000).toFixed(1)}s · ${res.rating === 3 ? "Good" : "Hard"}`);
+    setPhase("good");
+    advance(1000);
+  }, [advance, logAttempt]);
 
   /** F2 staff→midi: the first key answers — octave-strict, sounding pitch (F𝄪4 accepts G4's key). */
   const finalizeReading = useCallback((a: ReadingAtom, note: NoteEvent) => {
@@ -908,6 +973,68 @@ export default function Practice() {
       if (st.matched.size >= 2) { st.finalized = true; finalizeInterval(a); }
       return;
     }
+    if (isTopoAtom(a)) {
+      const stream = st.topoStream;
+      if (!stream) return;
+      const cur = stream.targets[st.topoIdx];
+      if (ph === "teach") {
+        // the intro target lit — find it once (the play shape)
+        if (!cur.midis.includes(n.midi) || st.teachHit.has(n.midi)) return;
+        st.teachHit.add(n.midi);
+        setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        if (st.teachHit.size >= cur.midis.length) {
+          const taught = afterTeach(st.card!);
+          st.filler.cards.set(a.id, taught);
+          void saveCard(taught);
+          advance(300);
+        }
+        return;
+      }
+      if (ph === "reconcile") {
+        // the correct find continues — a grab re-grabbed together (F9 §Grading)
+        if (performance.now() < st.reconcileArmedAt) return;
+        if (!cur.midis.includes(n.midi)) {
+          setKeys({ ...Object.fromEntries(cur.midis.map(m => [m, "exp" as KeyState])), [n.midi]: "err" });
+          st.reconcileBuf = [];
+          return;
+        }
+        st.reconcileBuf = st.reconcileBuf.filter(x => n.onMs - x.onMs <= (CHORD_SPREAD_MS + st.profileJitterMs) * 1.5);
+        if (!st.reconcileBuf.some(x => x.midi === n.midi)) st.reconcileBuf.push({ midi: n.midi, onMs: n.onMs });
+        setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        if (st.reconcileBuf.length >= cur.midis.length) { ui.good(); advance(250); }
+        return;
+      }
+      if (ph !== "prompt" || st.finalized) return;
+      st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
+      const ev = evalTopoPrompt(
+        { midis: cur.midis, spreadMs: CHORD_SPREAD_MS + st.profileJitterMs, leap: a.span !== "inPosition" },
+        st.collected.slice(st.topoBufStart),
+      );
+      if (ev.status === "pending") {
+        if (cur.midis.includes(n.midi)) setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        return;
+      }
+      if (ev.status === "flawed") {
+        st.finalized = true;
+        setKeys(k => ({ ...k, [n.midi]: "err" }));
+        finalizeTopo(a, { errors: ev.errorEvents, timingOnly: ev.timingOnly });
+        return;
+      }
+      // clean find: record its latency, roll the queue
+      setKeys(k => ({ ...k, [n.midi]: "ok" }));
+      st.topoLats.push(ev.completedAtMs - st.topoPromptAt);
+      st.topoIdx++;
+      if (st.topoIdx >= stream.targets.length) {
+        st.finalized = true;
+        finalizeTopo(a, null);
+        return;
+      }
+      st.topoBufStart = st.collected.length;
+      st.topoPromptAt = ev.completedAtMs;
+      setTopoView({ cur: stream.targets[st.topoIdx], next: stream.targets[st.topoIdx + 1] ?? null });
+      setFlashProg([st.topoIdx + 1, stream.targets.length]);
+      return;
+    }
     if (isFlashAtom(a)) {
       const fin = st.flashInst;
       if (!fin) return;
@@ -1140,7 +1267,7 @@ export default function Practice() {
     document.addEventListener("pointerdown", arm);
     const params = new URLSearchParams(window.location.search);
     const f = params.get("family");
-    const fam: Family = f === "scale" || f === "arp" || f === "keys" || f === "reading" || f === "interval" || f === "flash" || f === "free" ? f : "chord";
+    const fam: Family = f === "scale" || f === "arp" || f === "keys" || f === "reading" || f === "interval" || f === "flash" || f === "topo" || f === "free" ? f : "chord";
     S.current.pool = poolFor(fam);
     setFamily(fam);
     if (params.get("template") === "starter") S.current.template = STARTER_TEMPLATE;
@@ -1204,6 +1331,7 @@ export default function Practice() {
       const st = S.current;
       if (st.retryTimer !== null) clearTimeout(st.retryTimer);
       if (st.interTimer !== null) clearTimeout(st.interTimer);
+      if (st.flashTimer !== null) clearTimeout(st.flashTimer);
       void pushOutbox();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1217,6 +1345,7 @@ export default function Practice() {
   const isInterval = atom !== null && isIntervalAtom(atom);
   const isIvSel = isInterval && (atom as IntervalAtom).answer === "selector";
   const isFlash = atom !== null && isFlashAtom(atom);
+  const isTopo = atom !== null && isTopoAtom(atom);
   // choice-answer teach: named result, inert widget, any tap continues (U2 §Teach) —
   // played keys may still walk the revealed tones instead (spell's at-instrument ack)
   const choiceTeach = phase === "teach" && (isKeys || isReadSel || isIvSel || isSpell);
@@ -1229,6 +1358,7 @@ export default function Practice() {
         ? [`from ${ivInst ? spellNoteName(ivInst.anchor) : "…"}`, `${atom.hand}${atom.form === "harmonic" ? " · together" : ""}`]
         : [`${atom.clef} clef`, atom.answer === "midi" ? "play it" : "name it"])
     : isFlashAtom(atom) ? [`${flInst?.clef ?? "treble"} clef`, phase === "prompt" ? "play it from memory" : "read the figure"]
+    : isTopoAtom(atom) ? [atom.hand, "eyes forward — find it by feel"]
     : isSpellAtom(atom) ? ["spell it", device ? "play or tap · any octave" : "any octave"]
     : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave · up and down" : "up and down"]
     : [atom.hand as string, atom.form as string];
@@ -1269,6 +1399,11 @@ export default function Practice() {
                 ? <div className="h-36 w-80 max-w-[64vw]"><StaffView clef={flInst.clef} sig={flInst.sig}
                     measure={{ time: flInst.time, durs: flInst.durs, chord: flInst.chord,
                       notes: phase === "prompt" ? [] : flInst.notes.map(x => ({ letter: x.letter, octave: x.octave })) }} /></div>
+                : isTopoAtom(atom) && topoView && atom.cue === "staff"
+                ? <div className="h-36 w-80 max-w-[64vw]"><StaffView clef={atom.hand === "RH" ? "treble" : "bass"}
+                    stream={{ current: topoView.cur.specs, next: topoView.next?.specs ?? null }} /></div>
+                : isTopoAtom(atom) && topoView
+                ? <div className="font-serif text-6xl leading-none">{topoView.cur.label}</div>
                 : <div className="font-serif text-6xl leading-none">{atomTitle(atom)}</div>}
               <div className="mt-2 text-[16px]">
                 <span className="text-[var(--ink)]">{subParts![0]}</span>
@@ -1283,6 +1418,7 @@ export default function Practice() {
                     : isReading ? `${feedback} — play it`
                     : isInterval ? feedback
                     : isFlash ? "Ungraded — play the figure once"
+                    : isTopo ? "Ungraded — find it once, eyes forward"
                     : isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}
                 </p>
               )}
@@ -1298,6 +1434,7 @@ export default function Practice() {
                       : isReadSel || isIvSel ? "Name it — or tap here to continue"
                       : isInterval ? ((atom as IntervalAtom).form === "harmonic" ? "Grab both together — or tap here to continue" : "Play it, anchor first — or tap here to continue")
                       : isReading ? "Play it — or tap here to continue"
+                      : isTopo ? ((atom as TopoAtom).target === "note" ? "Find it — or tap here to continue" : "Grab it together — or tap here to continue")
                       : isSpell ? "Tap the tones — or tap here to continue"
                       : isRun ? "Walk it from the bottom — or tap here to continue"
                       : "Play it together — or tap to continue"}

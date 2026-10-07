@@ -21,8 +21,15 @@ export interface StaffMeasureSpec {
   chord?: boolean;
 }
 
+/** F9's rolling staff: current target full-ink, next ghosted — a single-target queue,
+ *  exempt from the metric-context rule (no time signature). */
+export interface StaffStreamSpec {
+  current: StaffNoteSpec[];    // one note, or a stacked grab
+  next?: StaffNoteSpec[] | null;
+}
+
 export function StaffView({
-  clef, sig = 0, letter = 0, octave = 4, inline = null, second = null, form = "melodic", measure = null, width = 320, height = 150,
+  clef, sig = 0, letter = 0, octave = 4, inline = null, second = null, form = "melodic", measure = null, stream = null, width = 320, height = 150,
 }: {
   clef: "treble" | "bass";
   sig?: number;
@@ -34,6 +41,8 @@ export function StaffView({
   form?: "melodic" | "harmonic";
   /** a full measure replaces the single-note surface (F8) */
   measure?: StaffMeasureSpec | null;
+  /** the rolling target queue replaces everything else (F9) */
+  stream?: StaffStreamSpec | null;
   width?: number;
   height?: number;
 }) {
@@ -57,9 +66,26 @@ export function StaffView({
       const key = (n: StaffNoteSpec) => `${LETTERS[n.letter].toLowerCase()}/${n.octave}`;
       const first: StaffNoteSpec = { letter, octave, inline };
       const blankBar = measure !== null && measure.notes.length === 0; // clef, signature, meter — nothing else
+      const GHOST = { fillStyle: "rgba(232,234,238,0.32)", strokeStyle: "rgba(232,234,238,0.32)" };
+      let ghosted: StaveNote | null = null;
       let notes: StaveNote[] = [];
       if (blankBar) {
         // the flash answered from memory: the bar stays empty
+      } else if (stream) {
+        const mk = (specs: StaffNoteSpec[], style: typeof GHOST | null) => {
+          const sn = new StaveNote({ clef, keys: specs.map(s => key(s)), duration: "q" });
+          specs.forEach((s, i) => {
+            if (s.inline != null) {
+              const acc = new Accidental(VF_ACC[s.inline]);
+              if (style) acc.setStyle(style);
+              sn.addModifier(acc, i);
+            }
+          });
+          if (style) { sn.setStyle(style); sn.setStemStyle(style); sn.setLedgerLineStyle(style); }
+          return sn;
+        };
+        notes = [mk(stream.current, null)];
+        if (stream.next && stream.next.length) { ghosted = mk(stream.next, GHOST); notes.push(ghosted); }
       } else if (measure) {
         notes = measure.chord
           ? [new StaveNote({ clef, keys: measure.notes.map(key), duration: measure.durs[0] })]
@@ -88,7 +114,7 @@ export function StaffView({
       }
       // stems, flags and ledger lines draw from the NOTE's style, not the context's —
       // without this the first stemmed duration ships black ink on the ebony ground
-      for (const n of notes) { n.setStyle(INK); n.setStemStyle(INK); n.setLedgerLineStyle(INK); }
+      for (const n of notes) { if (n === ghosted) continue; n.setStyle(INK); n.setStemStyle(INK); n.setLedgerLineStyle(INK); }
       if (!blankBar) {
         const voice = new Voice({ numBeats: 4, beatValue: 4 });
         voice.setStrict(false);
@@ -104,6 +130,6 @@ export function StaffView({
     } catch {
       el.textContent = "…"; // engraving failure never blanks the player
     }
-  }, [clef, sig, letter, octave, inline, second, form, measure, width, height]);
+  }, [clef, sig, letter, octave, inline, second, form, measure, stream, width, height]);
   return <div ref={host} className="h-full w-full" />;
 }

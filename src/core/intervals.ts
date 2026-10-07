@@ -13,8 +13,9 @@ export const KIND_SEMITONES: Record<string, number> = {
 const KIND_STEPS: Record<string, number> = {
   m2: 1, M2: 1, m3: 2, M3: 2, P4: 3, P5: 4, m6: 5, M6: 5, m7: 6, M7: 6, P8: 7,
 };
-// canonical anchor spellings for the all-anchors pool (PC_NAMES' choices)
-const PC_SPELLING: [number, number][] = // pc → [letter, inline]
+// canonical anchor spellings for the all-anchors pool (PC_NAMES' choices) — F9's target
+// pool spells on the same anchors (F9 §Mechanics)
+export const PC_SPELLING: [number, number][] = // pc → [letter, inline]
   [[0, 0], [0, 1], [1, 0], [2, -1], [2, 0], [3, 0], [3, 1], [4, 0], [5, -1], [5, 0], [6, -1], [6, 0]];
 
 export interface SpelledNote { letter: number; octave: number; inline: number; midi: number; }

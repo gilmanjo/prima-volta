@@ -39,6 +39,10 @@ export const FLASH_N_GATE = 5;               // the rep that would complete an e
 export const FLASH_KS_ENTRY_TIER = 1;        // wider-context classes admit at the 1200ms rung
 export const FLASH_RESHOW_MS = 1400;         // a missed figure re-engraves for a breath
 
+// F9 topography (F9 §Grading): a clean stream rates by MEDIAN per-target latency against
+// the generous learning budget — T4's timed feed is the clock that tightens, later.
+export const TOPO_BUDGET_MS = 5000;
+
 // Practice-local steps (04 §2) — item-denominated with a clock fallback.
 export const CONFIRM_AFTER_ITEMS = 20;
 export const CONFIRM_AFTER_MS = 10 * 60_000;
