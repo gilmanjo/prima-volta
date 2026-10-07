@@ -298,13 +298,24 @@ export function majorSigOf(pc: Pc): number {
   return s;
 }
 
-/** Lead-sheet symbol, slash bass for inversions — one continuous run (log #57/#58). */
+/** Lead-sheet symbol, slash bass for inversions — one continuous run (log #57/#58).
+ *  The bass spells as the CHORD spells it (the 3rd of B is D♯, never E♭) — the same
+ *  letter arithmetic the staff engraves, so symbol and engraving agree. */
 export function chordSymbol(a: ChordAtom): string {
   const root = PC_NAMES[a.root];
   const base = root + (Q_SYMBOL[a.quality] ?? a.quality);
   const inv = a.inversion ?? 0;
   if (!inv) return base;
-  return `${base}/${PC_NAMES[chordPcs(a)[0]]}`;
+  const ivs = Q_INTERVALS[a.quality];
+  const steps = Q_LETTER_STEPS[a.quality];
+  const bassPc = chordPcs(a)[0];
+  const [rootLetter] = ROOT_SPELLING[a.root];
+  const letter = (rootLetter + steps[inv % ivs.length]) % 7;
+  let d = (bassPc - LETTER_PC_CHORD[letter]) % 12;
+  if (d > 6) d -= 12;
+  if (d < -6) d += 12;
+  const g: Record<number, string> = { [-2]: "𝄫", [-1]: "♭", 0: "", 1: "♯", 2: "𝄪" };
+  return `${base}/${"CDEFGAB"[letter]}${g[d] ?? ""}`;
 }
 
 const SCALE_LABEL: Record<ScaleType, string> = {

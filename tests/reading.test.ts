@@ -38,6 +38,19 @@ describe("instance sampling (02 §1: seeded variety, re-displayable forever)", (
     }
   });
 
+  it("the bands tile without gaps (log #98): G3, D6 and bass F4 are all drillable", () => {
+    const seen = new Set<string>();
+    for (let seed = 0; seed < 3000; seed++) {
+      const t = sampleReading({ id: "t", family: "reading", inDefault: true, clef: "treble", band: "ledger3", keyContext: "open", accidental: "none", answer: "selector" } as never, seed);
+      seen.add(`t:${t.letter}/${t.octave}`);
+      const b = sampleReading({ id: "b", family: "reading", inDefault: true, clef: "bass", band: "ledger3", keyContext: "open", accidental: "none", answer: "selector" } as never, seed);
+      seen.add(`b:${b.letter}/${b.octave}`);
+    }
+    expect(seen.has("t:4/3")).toBe(true); // G3 — between the old treble pools
+    expect(seen.has("t:1/6")).toBe(true); // D6
+    expect(seen.has("b:3/4")).toBe(true); // F4 — between the old bass pools
+  });
+
   it("bands sample their zones: treble staff12 stays within A3–C6", () => {
     for (let seed = 0; seed < 300; seed++) {
       const i = sampleReading(atom({}), seed);

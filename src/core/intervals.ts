@@ -81,13 +81,15 @@ export function sampleInterval(a: IntervalAtom, tier: number, seed: number): Int
 
   let anchor: SpelledNote;
   if (a.cue === "staff") {
-    // render inside the staff ± a ledger: anchor from D4..C5 (treble) / F2..E3 (bass), inward-safe
+    // the WHOLE pair renders inside the staff ± a ledger (treble C4..A5 · bass E2..C4):
+    // the anchor range shifts by the interval's letter span in the pair's direction
     const clef = a.clef === "bass" ? "bass" : "treble";
-    const pool: [number, number][] = clef === "treble"
-      ? [[1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4], [0, 5]]
-      : [[3, 2], [4, 2], [5, 2], [6, 2], [0, 3], [1, 3], [2, 3]];
-    const [l, o] = pick(pool);
-    anchor = spell(l, o, tier === 1 ? pick([-1, 0, 0, 1]) : 0);
+    const pairUp = a.form === "harmonic" ? true : dirUp; // harmonic staff pairs stack upward
+    const [bandLo, bandHi] = clef === "treble" ? [28, 40] : [16, 28]; // diatonic index L = octave·7 + letter
+    const aLo = pairUp ? bandLo : bandLo + steps;
+    const aHi = pairUp ? bandHi - steps : bandHi;
+    const L = aLo + Math.floor(rnd() * (aHi - aLo + 1));
+    anchor = spell(((L % 7) + 7) % 7, Math.floor(L / 7), tier === 1 ? pick([-1, 0, 0, 1]) : 0);
   } else {
     // name-cue registers per hand (03 §7: an octave-qualified name is a register cue — exact)
     const octave = a.hand === "LH" ? 3 : 4;

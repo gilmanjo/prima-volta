@@ -36,10 +36,13 @@ export function gradePulsedRun(spec: PulsedRunSpec, notesIn: NoteEvent[]): Pulse
   const expected: Slot[] = spec.slots.flatMap(s =>
     s.midis.map(midi => ({ midi, tMs: spec.t0Ms + s.beat * spec.noteMs, matched: null, resolved: false })));
   const endMs = expected.length ? expected[expected.length - 1].tMs : spec.t0Ms;
-  // notes before the first beat's association reach were count-in fidgets, not the run
+  // notes before the first beat's association reach were count-in fidgets, not the run;
+  // consecutive same-key onsets collapse (03 §7's chatter law — no run repeats a pitch
+  // back-to-back, so the collapse can never eat an answer)
   const played = notesIn
     .filter(n => n.onMs >= spec.t0Ms - assocMs && n.onMs <= endMs + assocMs)
     .sort((a, b) => a.onMs - b.onMs)
+    .filter((n, i, xs) => i === 0 || n.midi !== xs[i - 1].midi)
     .map(n => ({ n, used: false }));
 
   // pass 1 — exact-pitch association, score order, nearest unmatched (03 §4)

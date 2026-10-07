@@ -33,6 +33,19 @@ async function tx<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectS
   });
 }
 
+/** One readwrite transaction across stores — a log row and its outbox entry land together
+ *  or not at all ("logs are truth" survives a killed tab between the two writes). */
+async function txAll(stores: string[], fn: (t: IDBTransaction) => void): Promise<void> {
+  const d = await db();
+  return new Promise((resolve, reject) => {
+    const t = d.transaction(stores, "readwrite");
+    fn(t);
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+    t.onabort = () => reject(t.error ?? new DOMException("aborted"));
+  });
+}
+
 export const store = {
   put: (s: string, key: string, value: unknown) => tx(s, "readwrite", os => os.put(value, key)),
   get: <T>(s: string, key: string) => tx<T | undefined>(s, "readonly", os => os.get(key) as IDBRequest<T | undefined>),
@@ -56,13 +69,17 @@ export interface AttemptRecord {
 }
 
 export async function appendAttempt(a: AttemptRecord): Promise<void> {
-  await store.put("attempts", a.id, a);
-  await store.put("outbox", `attempt:${a.id}`, { kind: "attempt", payload: a });
+  await txAll(["attempts", "outbox"], t => {
+    t.objectStore("attempts").put(a, a.id);
+    t.objectStore("outbox").put({ kind: "attempt", payload: a }, `attempt:${a.id}`);
+  });
 }
 
 export async function appendReview(r: ReviewRow & { id: string }): Promise<void> {
-  await store.put("reviews", r.id, r);
-  await store.put("outbox", `review:${r.id}`, { kind: "review", payload: r });
+  await txAll(["reviews", "outbox"], t => {
+    t.objectStore("reviews").put(r, r.id);
+    t.objectStore("outbox").put({ kind: "review", payload: r }, `review:${r.id}`);
+  });
 }
 
 import type { DeviceProfile } from "./midi";
@@ -79,9 +96,11 @@ export async function pullReplica(
       reviews: (import("../core/refold").RefoldRow & { id: string; tier: number })[];
       profiles: (DeviceProfile & { calibratedAt?: number | null })[];
     };
+    // profiles import even when the review stream is empty — a calibrated rig with no
+    // reps yet is still config worth having on a new device (03 §3)
+    for (const p of body.profiles ?? []) await store.put("profiles", p.id, p);
     if (!body.reviews.length) return 0;
     for (const r of body.reviews) await store.put("reviews", r.id, r);
-    for (const p of body.profiles ?? []) await store.put("profiles", p.id, p);
     const cards = refold(body.reviews);
     for (const c of cards.values()) await store.put("cards", c.atomId, c);
     await store.put("meta", "pulledAt", Date.now());
@@ -102,8 +121,17 @@ export async function loadProfile(id: string): Promise<(DeviceProfile & { calibr
 }
 
 /** The current bout's id for an attempt happening NOW (08 §6): continues the sitting within
- *  the idle window, else closes the stale bout at its last activity and opens a fresh one. */
-export async function touchBout(profileId: string | null, nowMs: number): Promise<string> {
+ *  the idle window, else closes the stale bout at its last activity and opens a fresh one.
+ *  Serialized — device-detect and the first post-idle attempt race otherwise, and the loser's
+ *  rotation would orphan a forever-open bout row. */
+let boutChain: Promise<unknown> = Promise.resolve();
+export function touchBout(profileId: string | null, nowMs: number): Promise<string> {
+  const next = boutChain.then(() => touchBoutInner(profileId, nowMs));
+  boutChain = next.catch(() => undefined);
+  return next;
+}
+
+async function touchBoutInner(profileId: string | null, nowMs: number): Promise<string> {
   const cur = await store.get<CurrentBout>("meta", "currentBout");
   const d = boutDecision(cur, nowMs, ulid());
   if (d.kind === "rotate") {
@@ -134,20 +162,37 @@ export async function attachBoutProfile(profileId: string): Promise<void> {
   await store.put("outbox", `bout:${updated.id}`, { kind: "bout", payload: updated });
 }
 
+// Each synced row costs the Worker one D1 subrequest; a multi-day offline backlog pushed
+// whole would die mid-request forever. Chunks keep every POST inside the budget — a chunk
+// that lands is deleted, a failure leaves the rest for the next push (10 §5).
+const PUSH_CHUNK = 40;
+
 export async function pushOutbox(): Promise<number> {
   const keys = (await store.allKeys("outbox")) as string[];
   if (!keys.length) return 0;
-  const entries = await Promise.all(keys.map(async k => ({ key: k, entry: await store.get<{ kind: string; payload: unknown }>("outbox", k) })));
-  const body = {
-    attempts: entries.filter(e => e.entry?.kind === "attempt").map(e => e.entry!.payload),
-    reviews: entries.filter(e => e.entry?.kind === "review").map(e => e.entry!.payload),
-    bouts: entries.filter(e => e.entry?.kind === "bout").map(e => e.entry!.payload),
-    profiles: entries.filter(e => e.entry?.kind === "profile").map(e => e.entry!.payload),
-  };
-  // offline or error: the outbox simply stays (10 §5) — a dead network is normal, never an exception
-  const res = await fetch("/api/sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
-    .catch(() => null);
-  if (!res || !res.ok) return 0;
-  await Promise.all(keys.map(k => store.del("outbox", k)));
-  return keys.length;
+  let pushed = 0;
+  for (let i = 0; i < keys.length; i += PUSH_CHUNK) {
+    const chunk = keys.slice(i, i + PUSH_CHUNK);
+    const entries = await Promise.all(chunk.map(async k => ({ key: k, entry: await store.get<{ kind: string; payload: unknown }>("outbox", k) })));
+    const sent = entries.filter(e => e.entry !== undefined);
+    const body = {
+      attempts: sent.filter(e => e.entry!.kind === "attempt").map(e => e.entry!.payload),
+      reviews: sent.filter(e => e.entry!.kind === "review").map(e => e.entry!.payload),
+      bouts: sent.filter(e => e.entry!.kind === "bout").map(e => e.entry!.payload),
+      profiles: sent.filter(e => e.entry!.kind === "profile").map(e => e.entry!.payload),
+    };
+    // offline or error: the outbox simply stays — a dead network is normal, never an exception
+    const res = await fetch("/api/sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+      .catch(() => null);
+    if (!res || !res.ok) break;
+    // delete only what was ACTUALLY sent: an LWW key (bout:/profile:) overwritten while the
+    // POST was in flight carries an unsent update and must stay for the next push
+    await Promise.all(sent.map(async e => {
+      const cur = await store.get<{ kind: string; payload: unknown }>("outbox", e.key);
+      if (cur === undefined) return;
+      if (JSON.stringify(cur) === JSON.stringify(e.entry)) await store.del("outbox", e.key);
+    }));
+    pushed += sent.length;
+  }
+  return pushed;
 }

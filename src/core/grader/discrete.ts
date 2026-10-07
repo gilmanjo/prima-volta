@@ -75,7 +75,7 @@ function gradeOneHand(
   let lowestSounded: number | null = null;
 
   for (const n of notes) {
-    if (seenMidi.has(n.midi) && completeAt === null) continue; // same-key retrigger: one note (device chatter)
+    if (seenMidi.has(n.midi)) continue; // same-key retrigger is never an answer event (03 §7) — before OR after completion
     seenMidi.add(n.midi);
     if (completeAt !== null) {
       const dt = n.onMs - completeAt;
@@ -153,7 +153,7 @@ export function splitHands(notes: NoteEvent[], pcs?: Pc[]): { LH: NoteEvent[]; R
 export function gradeDiscreteChord(
   spec: DiscreteChordSpec,
   notes: NoteEvent[],
-  embeddedIds?: { RH?: string; LH?: string; embeddedWindowMs?: number },
+  embeddedIds?: { RH?: string; LH?: string; embeddedWindowMs?: { RH: number; LH: number } },
 ): GradedAttempt {
   if (spec.hand !== "HT") {
     return { primary: gradeOneHand(spec.pcs, notes, spec, spec.hand), embedded: new Map() };
@@ -171,11 +171,11 @@ export function gradeDiscreteChord(
   const inWindow = clean && latencyMs !== null && latencyMs <= spec.windowMs;
   const primary: GradeResult = { rating: !clean ? 1 : inWindow ? 3 : 2, latencyMs, errorEvents: errors, clean, inWindow };
   // embedded (02 §3, improvement-only enforced by the scheduler): each hand ON ITS OWN TERMS,
-  // judged against the SUBSUMED card's window — clean-but-slow writes nothing downward.
+  // judged against ITS OWN subsumed card's window (a tier-1 solo card keeps its 900ms bar —
+  // a slow HT hand must never bank gate evidence the solo rep would have refused).
   const embedded = new Map<string, GradeResult>();
-  const w = embeddedIds?.embeddedWindowMs ?? spec.windowMs;
-  const judge = (r: GradeResult): GradeResult => ({ ...r, inWindow: r.clean && r.latencyMs !== null && r.latencyMs <= w });
-  if (embeddedIds?.LH) embedded.set(embeddedIds.LH, judge(lh));
-  if (embeddedIds?.RH) embedded.set(embeddedIds.RH, judge(rh));
+  const judge = (r: GradeResult, w: number): GradeResult => ({ ...r, inWindow: r.clean && r.latencyMs !== null && r.latencyMs <= w });
+  if (embeddedIds?.LH) embedded.set(embeddedIds.LH, judge(lh, embeddedIds.embeddedWindowMs?.LH ?? spec.windowMs));
+  if (embeddedIds?.RH) embedded.set(embeddedIds.RH, judge(rh, embeddedIds.embeddedWindowMs?.RH ?? spec.windowMs));
   return { primary, embedded };
 }

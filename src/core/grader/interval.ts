@@ -23,15 +23,19 @@ export function gradeIntervalPair(spec: IntervalSpec, notes: NoteEvent[]): Grade
   if (spec.form === "melodic") {
     const last = sorted[Math.min(sorted.length, 2) - 1];
     const latencyMs = last ? Math.round(last.onMs - spec.promptAtMs) : null;
-    // order enforced: anchor first, target second
-    if (sorted[0]?.midi !== spec.anchorMidi) {
-      errors.push({ type: "substitution", expectedMidi: spec.anchorMidi, playedMidi: sorted[0]?.midi, tags: ["order"] });
-    } else if (sorted[1]?.midi !== spec.targetMidi) {
-      const samePc = sorted[1] !== undefined && ((sorted[1].midi - spec.targetMidi) % 12 + 12) % 12 === 0;
-      errors.push({ type: samePc ? "wrongOctave" : "substitution", expectedMidi: spec.targetMidi, playedMidi: sorted[1]?.midi, tags: [] });
+    // order enforced: anchor first, target second — an unplayed note is a DELETION, never
+    // a phantom substitution (the diagnosis stream feeds remediation and the prescriber)
+    if (sorted.length === 0) {
+      errors.push({ type: "deletion", expectedMidi: spec.anchorMidi, tags: [] });
+    } else if (sorted[0].midi !== spec.anchorMidi) {
+      errors.push({ type: "substitution", expectedMidi: spec.anchorMidi, playedMidi: sorted[0].midi, tags: ["order"] });
+    } else if (sorted[1] === undefined) {
+      errors.push({ type: "deletion", expectedMidi: spec.targetMidi, tags: [] });
+    } else if (sorted[1].midi !== spec.targetMidi) {
+      const samePc = ((sorted[1].midi - spec.targetMidi) % 12 + 12) % 12 === 0;
+      errors.push({ type: samePc ? "wrongOctave" : "substitution", expectedMidi: spec.targetMidi, playedMidi: sorted[1].midi, tags: [] });
     }
-    const clean = errors.length === 0 && sorted.length >= 2;
-    if (!clean && errors.length === 0) errors.push({ type: "deletion", expectedMidi: spec.targetMidi, tags: [] });
+    const clean = errors.length === 0;
     const inWindow = clean && latencyMs !== null && latencyMs <= spec.windowMs;
     return { rating: !clean ? 1 : inWindow ? 3 : 2, latencyMs, errorEvents: errors, clean, inWindow };
   }

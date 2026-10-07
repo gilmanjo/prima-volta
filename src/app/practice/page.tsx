@@ -141,6 +141,7 @@ export default function Practice() {
   const [chordStaff, setChordStaff] = useState<ChordStaffNote[] | null>(null);
   const [engCells, setEngCells] = useState<EngravingPickInstance["cells"] | null>(null);
   const [beat, setBeat] = useState<[number, boolean] | null>(null); // [beat-in-bar, isCountIn] — the pulse strip
+  const [serveN, setServeN] = useState(0); // keys the per-item widgets so local picks never survive a serve
   const [verdictBad, setVerdictBad] = useState(false); // a non-blocking Again verdict reads felt-red
   const [doubles, setDoubles] = useState(false);
 
@@ -161,6 +162,7 @@ export default function Practice() {
     topoStream: TopoStream | null; topoIdx: number; topoBufStart: number; topoPromptAt: number; topoLats: number[]; topoSeed: number;
     staffChordMidis: number[]; engSeed: number; engCorrect: string;
     pulse: RunClock | null; pulseTimer: number | null;
+    advancing: boolean; advTimers: number[]; flashDone: boolean;
   }>({
     filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, pool: CHORD_POOL, served: 0,
     profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
@@ -174,6 +176,7 @@ export default function Practice() {
     topoStream: null, topoIdx: 0, topoBufStart: 0, topoPromptAt: 0, topoLats: [], topoSeed: 0,
     staffChordMidis: [], engSeed: 0, engCorrect: "correct",
     pulse: null, pulseTimer: null,
+    advancing: false, advTimers: [], flashDone: false,
   });
 
   const phaseRef = useRef<Phase>("init");
@@ -232,6 +235,9 @@ export default function Practice() {
     }
     st.served++;
     st.blockServed++;
+    st.advancing = false; // the new item re-arms the one-shot
+    st.advTimers = [];    // both fade timers have fired by now (the latch allowed only one pair)
+    setServeN(n => n + 1); // remount per-item widgets: no half-picked state crosses a serve
     noteServed(st.filler, res.atom);
     st.card = res.card;
     st.promptAt = performance.now();
@@ -502,13 +508,18 @@ export default function Practice() {
   }, []);
 
   /** The between-items beat (U2): the prompt fades out, a breath with the serve tick, the next
-   *  fades in — so the next prompt reads as NEW even when it differs only by hand. */
+   *  fades in — so the next prompt reads as NEW even when it differs only by hand.
+   *  ONE-SHOT per item: every completion path (reconcile re-grabs, teach acks, continue taps)
+   *  can fire more than once in the fade window — only the first advances (one serve per item). */
   const advance = useCallback((delayMs = 0) => {
-    setTimeout(() => {
+    const st = S.current;
+    if (st.advancing) return;
+    st.advancing = true;
+    st.advTimers.push(window.setTimeout(() => {
       setPhase("next"); setKeys({}); // atom stays mounted so the outgoing prompt can fade
       ui.tick();
-      setTimeout(serve, 380);
-    }, delayMs);
+      st.advTimers.push(window.setTimeout(serve, 380));
+    }, delayMs));
   }, [serve]);
 
   const logAttempt = useCallback((a: DrillAtom, attemptId: string, nowMs: number, gradeJson: Record<string, unknown>, rawChoiceJson?: unknown, seed?: string) => {
@@ -577,6 +588,8 @@ export default function Practice() {
     setFlashProg([st.flashI + 1, st.flashCount]);
     st.flashPos = 0;
     st.matched = new Set();
+    st.flashDone = false; // the per-instance latch re-arms (phaseRef lags the committed phase)
+    st.flashBlankAt = Infinity; // answers only count once THIS instance's blank begins
     st.flashNoteStart = st.collected.length; // the rep's raw stream accumulates; grade the slice
     setKeys({});
     setFeedback("");
@@ -594,7 +607,10 @@ export default function Practice() {
   const finishFlashInstance = useCallback(() => {
     const st = S.current;
     const a = atomRef.current;
-    if (!a || !isFlashAtom(a) || phaseRef.current !== "prompt") return; // timer/walker double-fire guard
+    // the latch, not phaseRef, is the double-fire guard: phaseRef commits a paint late,
+    // and a trailing note can land in that window (one grade per instance, ever)
+    if (!a || !isFlashAtom(a) || st.flashDone || phaseRef.current !== "prompt") return;
+    st.flashDone = true;
     if (st.flashTimer !== null) { clearTimeout(st.flashTimer); st.flashTimer = null; }
     const fin = st.flashInst!;
     const res = gradeFlashInstance({
@@ -975,10 +991,13 @@ export default function Practice() {
         spreadMs: CHORD_SPREAD_MS + st.profileJitterMs, // every grading window widens by jitter (03 §3)
       },
       st.collected,
-      a.hand === "HT" ? {
-        LH: subs.find(x => x.hand === "LH")?.id, RH: subs.find(x => x.hand === "RH")?.id,
-        embeddedWindowMs: 5000,
-      } : undefined,
+      a.hand === "HT" ? (() => {
+        // each hand's derived credit is judged against ITS OWN card's window (04 §4)
+        const lhId = subs.find(x => x.hand === "LH")?.id;
+        const rhId = subs.find(x => x.hand === "RH")?.id;
+        const winOf = (id?: string) => { const c = id ? st.filler.cards.get(id) : undefined; return c ? windowFor(c) : windowFor(card); };
+        return { LH: lhId, RH: rhId, embeddedWindowMs: { LH: winOf(lhId), RH: winOf(rhId) } };
+      })() : undefined,
     );
     const attemptId = ulid();
     const nowMs = Date.now();
@@ -1345,7 +1364,9 @@ export default function Practice() {
         }
         return;
       }
-      if (ph !== "prompt") return; // input during the flash itself waits for the blank
+      // input counts only in THIS instance's blank — the stale-phase window after a finish
+      // (phaseRef commits late) must never feed the next, undisplayed instance
+      if (ph !== "prompt" || st.flashDone || n.onMs < st.flashBlankAt) return;
       st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
       if (fin.chord) {
         if (st.matched.has(n.midi)) return; // retrigger of a held key — chatter (03 §7)
@@ -1418,12 +1439,13 @@ export default function Practice() {
       }
       if (ph === "prompt" && !st.finalized && isKeysigRunAtom(a)) {
         // pulsed capture (03 §6): the take runs to the clock's end — no mid-take blocking;
-        // lighting is display-only (in the anchored path = ok, else err)
+        // lighting is display-only (in the anchored path = ok, else err). The octave anchor
+        // keeps looking until a tonic-pc note near beat zero lands — a count-in position
+        // touch must never freeze the lights at the wrong register (grading re-derives it)
         st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
         const run = st.run!;
-        const off = st.collected.length === 1 ? pulsedOffset(run.slots, st.collected, st.pulse?.t0Ms ?? st.promptAt, st.runNoteMs) : st.runOffset;
-        if (st.collected.length === 1) st.runOffset = off;
-        setKeys(k => ({ ...k, [n.midi]: run.pathMidis.some(m => m + off === n.midi) ? "ok" : "err" }));
+        if (st.runOffset === 0) st.runOffset = pulsedOffset(run.slots, st.collected, st.pulse?.t0Ms ?? st.promptAt, st.runNoteMs);
+        setKeys(k => ({ ...k, [n.midi]: run.pathMidis.some(m => m + st.runOffset === n.midi) ? "ok" : "err" }));
         return;
       }
       if (ph === "prompt" && !st.finalized) {
@@ -1604,9 +1626,14 @@ export default function Practice() {
           });
           // a bout opens on device detect (08 §6); attach the profile if it opened without one
           void touchBout(d.id, Date.now()).then(() => attachBoutProfile(d.id));
+        } else {
+          S.current.profileId = null; // knowledge-only practice after an unplug logs no profile (10 §4)
         }
       }).catch(() => setDevice(null));
       await Promise.race([midiInit, new Promise(res => setTimeout(res, 1500))]);
+      // the race can resolve after an unmount: never re-register listeners or serve as a
+      // zombie (the fresh mount's handlers would be clobbered and the page left deaf)
+      if (!alive) return;
       onNote(n => handleNote(n));
       // a correct key's green lives with the note (U2, log #87): fade back to base on release
       onNoteOff(({ midi }) => {
@@ -1633,6 +1660,8 @@ export default function Practice() {
       if (st.flashTimer !== null) clearTimeout(st.flashTimer);
       if (st.pulseTimer !== null) clearTimeout(st.pulseTimer);
       if (st.pulse) st.pulse.stop();
+      for (const t of st.advTimers) clearTimeout(t); // no zombie serve after "←" mid-fade
+      st.advTimers = [];
       void pushOutbox();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1810,15 +1839,15 @@ export default function Practice() {
                   ? <KeyWheel mode={atom.mode} states={picks} onPick={handlePick} />
                   : <SigGrid clef={atom.clef} states={picks} onPick={handlePick} />
               ) : isReadSel && inst ? (
-                <NoteSelector doubles={doubles} onCommit={handleReadingPick}
+                <NoteSelector key={serveN} doubles={doubles} onCommit={handleReadingPick}
                   reveal={phase === "teach" || phase === "reconcile" ? { letter: inst.letter, inline: inst.eff, octave: inst.octave } : null} />
               ) : isIvSel && ivInst ? (
-                <IntervalSelector onCommit={handleIntervalPick}
+                <IntervalSelector key={serveN} onCommit={handleIntervalPick}
                   reveal={phase === "teach" || phase === "reconcile" ? { size: ivInst.size, quality: ivInst.quality } : null} />
               ) : isSpell ? (
                 <SpellChips states={keys} onTap={spellInput} />
               ) : isChordId && atom ? (
-                <ChordIdSelector onCommit={handleIdPick}
+                <ChordIdSelector key={serveN} onCommit={handleIdPick}
                   reveal={phase === "teach" || phase === "reconcile"
                     ? { root: (atom as ChordAtom).root, quality: (atom as ChordAtom).quality, inversion: (atom as ChordAtom).inversion ?? 0 } : null} />
               ) : isEng && engCells ? (

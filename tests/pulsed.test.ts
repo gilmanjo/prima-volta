@@ -29,6 +29,14 @@ describe("run shapes (F5/F6 — up-down, apex once)", () => {
     expect(r.slots.filter(s => s.midis[0] === 72).length).toBe(1);
   });
 
+  it("a same-key bounce never fails a pulsed take (03 §7's chatter law, log #98)", () => {
+    const r = buildRun(scale());
+    const s = spec(r.slots);
+    const notes = play(r.slots, () => 0);
+    const bounced = [...notes, { midi: notes[3].midi, onMs: notes[3].onMs + 15, vel: 60 }];
+    expect(gradePulsedRun(s, bounced).result.rating).toBe(3); // one 15ms bounce, still Good
+  });
+
   it("name-cue register freedom (03 §7): the first tonic-pc note fixes the octave offset", () => {
     // Jordan's pathology: LH B♭ major anchored at B♭2 (46) — the home position is B♭3 (58)
     const r = buildRun(scale({ key: 10, hand: "LH" }));

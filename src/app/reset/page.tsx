@@ -3,14 +3,17 @@
 // Deliberately unlinked from the app chrome; the ruled System row (U7, P5) supersedes it.
 import { useState } from "react";
 import Link from "next/link";
+import { pushOutbox } from "../../services/store";
 
 type State = "idle" | "done" | "blocked" | "error";
 
 export default function Reset() {
   const [state, setState] = useState<State>("idle");
 
-  const erase = () => {
+  const erase = async () => {
     try {
+      // unsynced reps leave for D1 first — erasing the device must never erase the global log
+      await pushOutbox().catch(() => 0);
       const req = indexedDB.deleteDatabase("prima-volta");
       req.onsuccess = () => setState("done");
       req.onerror = () => setState("error");

@@ -1,7 +1,7 @@
 // Expected-run builder for pulsed material (F5 scales · F6 arpeggios, T1 form):
 // one octave, up-down, top note once at the apex (the ruled turnaround).
 // Registers are the T1 home positions: RH from C4+key, LH an octave below; HT parallel.
-import { RUN_BEAT_MS, RUN_GATE_BEAT_MS, RUN_GATE_NOTES_PER_BEAT } from "./constants";
+import { ASSOC_MIN_MS, RUN_BEAT_MS, RUN_GATE_BEAT_MS, RUN_GATE_NOTES_PER_BEAT } from "./constants";
 import type { ArpAtom, ScaleAtom, ScaleType } from "./catalog";
 
 /** The tempo a run card's tier demands (F5/F6 anchor notation, ruled): the learning tier
@@ -72,7 +72,7 @@ export function anchorOffset(firstSlot: RunSlot, midi: number): number | null {
 export function pulsedOffset(slots: RunSlot[], notes: { midi: number; onMs: number }[], t0Ms: number, noteMs: number): number {
   const m0 = slots[0]?.midis[0];
   if (m0 === undefined) return 0;
-  const reach = Math.max(noteMs / 2, 250);
+  const reach = Math.max(noteMs / 2, ASSOC_MIN_MS); // the grader's association reach, exactly
   let best = 0, bestD = Infinity;
   for (const n of notes) {
     if (((n.midi - m0) % 12 + 12) % 12 !== 0) continue;

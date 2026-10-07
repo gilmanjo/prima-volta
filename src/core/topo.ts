@@ -16,8 +16,11 @@ export interface TopoTarget {
 export interface TopoStream { targets: TopoTarget[]; }
 
 // registers: the on-screen keybed's feedback range per hand; the staff cue narrows the LH
-// to what the bass staff can carry within a couple of ledgers (F9 §Mechanics)
+// to what the bass staff can carry within a couple of ledgers (F9 §Mechanics). The WIDE
+// tier is cross-keyboard by definition — name-cue leapWide spans the whole feedback range
+// (a 13–24-semitone leap law cannot live inside a one-octave band).
 function boundsFor(a: TopoAtom): [number, number] {
+  if (a.span === "leapWide" && a.cue === "name") return [45, 84];
   if (a.hand === "RH") return [57, 84];
   return a.cue === "staff" ? [45, 64] : [45, 72];
 }
@@ -69,7 +72,14 @@ export function sampleTopoStream(a: TopoAtom, tier: number, seed: number): TopoS
       if (gap === null) { if (Math.abs(m - roots[0]) <= 7) pool.push(m); }
       else { const d = Math.abs(m - prev); if (d >= gap[0] && d <= gap[1]) pool.push(m); }
     }
-    roots.push(pool.length ? pick(pool) : prev + (prev > (lo + rootHi) / 2 ? -7 : 7)); // a leap back inward, never a stall
+    if (pool.length) { roots.push(pick(pool)); continue; }
+    // the register can't carry the full leap (a wide grab near a band edge): take the
+    // FARTHEST in-bounds moves instead — bounds always hold, the leap is as real as it can be
+    let far = 0;
+    for (let m = lo; m <= rootHi; m++) if (m !== prev) far = Math.max(far, Math.abs(m - prev));
+    const fallback: number[] = [];
+    for (let m = lo; m <= rootHi; m++) if (m !== prev && Math.abs(m - prev) >= Math.max(1, far - 2)) fallback.push(m);
+    roots.push(fallback.length ? pick(fallback) : prev);
   }
 
   const targets: TopoTarget[] = roots.map(midi => {

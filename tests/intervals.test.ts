@@ -50,6 +50,31 @@ describe("anchor sampling (F3 §Grading: instance variety; the tier IS the pool)
     expect(spellNoteName({ letter: 6, octave: 3, inline: -1, midi: 58 })).toBe("B♭3");
   });
 
+  it("staff pairs stay in the band BOTH directions (log #98: down-pairs shift the anchor up)", () => {
+    for (const clef of ["treble", "bass"] as const) {
+      const [lo, hi] = clef === "treble" ? [28, 40] : [16, 28]; // diatonic L, staff ± a ledger
+      for (const kind of ["m2", "P5", "P8"]) for (const dir of ["up", "down"] as const)
+        for (let seed = 0; seed < 40; seed++) {
+          const i = sampleInterval(atom({ kind, dir, cue: "staff", clef, hand: null, answer: "selector" }), 0, seed);
+          for (const x of [i.anchor, i.target]) {
+            const L = x.octave * 7 + x.letter;
+            expect(L).toBeGreaterThanOrEqual(lo);
+            expect(L).toBeLessThanOrEqual(hi);
+          }
+        }
+    }
+  });
+
+  it("an unplayed note is a DELETION, never a phantom substitution (log #98: the diagnosis stream)", () => {
+    const spec = { anchorMidi: 67, targetMidi: 76, form: "melodic" as const, windowMs: 5000, spreadMs: 105, promptAtMs: 1000 };
+    const none = gradeIntervalPair(spec, []);
+    expect(none.rating).toBe(1);
+    expect(none.errorEvents[0]).toMatchObject({ type: "deletion", expectedMidi: 67 });
+    const anchorOnly = gradeIntervalPair(spec, [{ midi: 67, onMs: 2000, vel: 60 }]);
+    expect(anchorOnly.rating).toBe(1);
+    expect(anchorOnly.errorEvents[0]).toMatchObject({ type: "deletion", expectedMidi: 76 });
+  });
+
   it("engraving spec: an unaltered note carries NO glyph (♮ only cancels; nothing to cancel here)", () => {
     expect(staffSpec({ letter: 0, octave: 4, inline: 0, midi: 60 }).inline).toBeNull();
     expect(staffSpec({ letter: 3, octave: 4, inline: 1, midi: 66 }).inline).toBe(1);

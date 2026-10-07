@@ -5,7 +5,6 @@
 // interval walks, the triad snowman, 3–5-note scale fragments, broken-chord figures.
 import type { FlashAtom } from "./catalog";
 import { LETTER_PC, mulberry32, sigEffect } from "./reading";
-import { PC_NAMES } from "./catalog";
 import { FLASH_DISPLAY_MS } from "./constants";
 
 export interface FlashNote { letter: number; octave: number; midi: number; }
@@ -42,9 +41,10 @@ const WALK_STEP: Record<string, number> = { second: 1, third: 2, fourth: 3, fift
 export function sampleFlash(a: FlashAtom, tier: number, seed: number): FlashInstance {
   const rnd = mulberry32(seed);
   const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)];
+  // −6 stays out: G♭ is scope-gated and F♯ carries the six-accidental slot (the F1 convention)
   const sig = a.keyContext === "open" ? 0
     : a.keyContext === "ks12" ? pick([-2, -1, 1, 2])
-    : pick([-6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6]);
+    : pick([-5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6]);
   const clef: "treble" | "bass" = a.clef === "grand" ? pick(["treble", "bass"]) : a.clef;
   const [lo, hi] = CLEF_RANGE[clef];
 
@@ -85,6 +85,10 @@ export function sampleFlash(a: FlashAtom, tier: number, seed: number): FlashInst
   const notes = (chord ? [...Ls].sort((x, y) => x - y) : Ls).map(L => spellAt(L, sig));
   return {
     notes, chord, ...pick(skins), sig, clef,
-    keyLabel: sig === 0 ? null : PC_NAMES[((sig * 7) % 12 + 12) % 12],
+    // the key as its SIGNATURE spells it (−5 = D♭, never C♯) — the key:X tag and the strip read this
+    keyLabel: sig === 0 ? null : KEY_LABELS[sig + 6],
   };
 }
+
+// major-key names per signature, −6…6 (the flat side spells flat: 5♭ = D♭, not C♯)
+const KEY_LABELS = ["G♭", "D♭", "A♭", "E♭", "B♭", "F", "C", "G", "D", "A", "E", "B", "F♯"];

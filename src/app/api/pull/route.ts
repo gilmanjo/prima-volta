@@ -15,6 +15,9 @@ export async function GET(): Promise<Response> {
     rating: reviewLogs.rating, latencyMs: reviewLogs.latencyMs, tier: reviewLogs.tier,
     derived: reviewLogs.derived, parentAttemptId: reviewLogs.parentAttemptId,
     reviewedAt: reviewLogs.reviewedAt,
+    // the fold reads none of these, but the local review store must not be lossy (logs = truth)
+    paramGroup: reviewLogs.paramGroup, instanceSeed: reviewLogs.instanceSeed,
+    errorSummaryJson: reviewLogs.errorSummaryJson,
   }).from(reviewLogs).where(eq(reviewLogs.userId, USER)).orderBy(asc(reviewLogs.reviewedAt));
   const profiles = await db.select().from(deviceProfiles).where(eq(deviceProfiles.userId, USER));
   return Response.json({ reviews, profiles });

@@ -27,11 +27,11 @@ export interface ReadingInstance {
 const POOLS: Record<"treble" | "bass", Record<"staff12" | "ledger3", [number, number][]>> = {
   treble: {
     staff12: span(5, 3, 0, 6),                    // A3 … C6
-    ledger3: [...span(0, 3, 3, 3), ...span(2, 6, 5, 6)], // C3–F3 · E6–A6
+    ledger3: [...span(0, 3, 4, 3), ...span(1, 6, 5, 6)], // C3–G3 · D6–A6 (no gap against staff12)
   },
   bass: {
     staff12: span(0, 2, 2, 4),                    // C2 … E4
-    ledger3: [...span(3, 1, 6, 1), ...span(4, 4, 0, 5)], // F1–B1 · G4–C5
+    ledger3: [...span(3, 1, 6, 1), ...span(3, 4, 0, 5)], // F1–B1 · F4–C5 (no gap against staff12)
   },
 };
 

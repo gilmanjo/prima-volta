@@ -76,6 +76,17 @@ describe("instance sampling (F8 §Mechanics: fresh renderings, real measures)", 
     expect(sharpened).toBeGreaterThan(10); // the signature genuinely bites
   });
 
+  it("the key labels spell as their SIGNATURES spell (log #98: 5♭ is D♭, never C♯; −6 stays out)", () => {
+    const seen = new Set<string>();
+    for (let seed = 0; seed < 200; seed++) {
+      const i = sampleFlash(atom({ pattern: "scaleFragment", keyContext: "ksAll" }), 0, seed);
+      expect(i.sig).not.toBe(-6); // G♭ is scope-gated; F♯ carries the six-accidental slot
+      if (i.keyLabel) seen.add(`${i.sig}:${i.keyLabel}`);
+    }
+    expect(seen.has("-5:D♭")).toBe(true);
+    expect([...seen].some(s => s.includes("C♯"))).toBe(false);
+  });
+
   it("instance seeds derive from the rep seed — one seed re-renders all N (04 §5)", () => {
     expect(deriveInstanceSeed(123, 0)).toBe(deriveInstanceSeed(123, 0));
     expect(deriveInstanceSeed(123, 0)).not.toBe(deriveInstanceSeed(123, 1));

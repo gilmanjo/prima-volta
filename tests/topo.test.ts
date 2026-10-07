@@ -39,6 +39,25 @@ describe("stream sampling (F9 §Mechanics)", () => {
     }
   });
 
+  it("leapWide is cross-keyboard (log #98): name-cue spans the whole range, leaps 13–24 where the register can carry them, bounds NEVER break", () => {
+    for (const hand of ["RH", "LH"] as const) {
+      let realWide = 0, total = 0;
+      for (let seed = 0; seed < 60; seed++) {
+        const s = sampleTopoStream(atom({ span: "leapWide", hand }), 0, seed);
+        for (let i = 0; i < s.targets.length; i++) {
+          for (const m of s.targets[i].midis) { expect(m).toBeGreaterThanOrEqual(45); expect(m).toBeLessThanOrEqual(84); }
+          if (i > 0) { total++; if (Math.abs(s.targets[i].midis[0] - s.targets[i - 1].midis[0]) >= 13) realWide++; }
+        }
+      }
+      expect(realWide / total).toBeGreaterThan(0.9); // the wide law genuinely holds in the wide range
+    }
+    // the narrow staff-cue LH band can't carry 13 for triads near its edges — bounds still hold
+    for (let seed = 0; seed < 60; seed++) {
+      for (const t of sampleTopoStream(atom({ span: "leapWide", hand: "LH", cue: "staff", target: "triad" }), 0, seed).targets)
+        for (const m of t.midis) { expect(m).toBeGreaterThanOrEqual(45); expect(m).toBeLessThanOrEqual(64); }
+    }
+  });
+
   it("registers honor the hand and the staff cue's bass band; spelling stays single-accidental", () => {
     for (let seed = 0; seed < 60; seed++) {
       for (const t of sampleTopoStream(atom({ span: "leapOctave" }), 0, seed).targets)

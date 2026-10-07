@@ -22,6 +22,21 @@ describe("discrete grader (03 §4/§6/§7)", () => {
     expect(g.primary.clean).toBe(true);
   });
 
+  it("a same-key bounce just AFTER completion is chatter, never an insertion (03 §7, log #98)", () => {
+    const g = gradeDiscreteChord(spec(), [n(60, 900), n(64, 920), n(67, 940), n(67, 952)]);
+    expect(g.primary.rating).toBe(3); // the 12ms bounce of the completing key collapses
+  });
+
+  it("each embedded hand judges against ITS OWN window (04 §4, log #98)", () => {
+    const notes = [n(48, 900), n(52, 920), n(55, 940), n(60, 950), n(64, 960), n(67, 2500)];
+    const g = gradeDiscreteChord(
+      spec({ hand: "HT", windowMs: 5000, spreadMs: 5000 }), notes,
+      { LH: "lh", RH: "rh", embeddedWindowMs: { LH: 5000, RH: 900 } },
+    );
+    expect(g.embedded.get("lh")?.inWindow).toBe(true);  // LH done by 940, learning window
+    expect(g.embedded.get("rh")?.inWindow).toBe(false); // RH's gate window (900ms) refuses 2500
+  });
+
   it("a wrong note then correction → Again (the error still rates it — R1)", () => {
     const g = gradeDiscreteChord(spec(), [n(61, 500), n(60, 700), n(64, 720), n(67, 730)]);
     expect(g.primary.rating).toBe(1);
@@ -105,7 +120,7 @@ describe("discrete grader (03 §4/§6/§7)", () => {
 
   it("embedded clean-but-slow is NOT in-window (clean-but-slow writes nothing downward, 02 §3)", () => {
     const notes = [n(48, 3000), n(52, 3010), n(55, 3020), n(72, 3050), n(76, 3060), n(79, 3070)];
-    const g = gradeDiscreteChord(spec({ hand: "HT", windowMs: 5000 }), notes, { LH: "lh1", RH: "rh1", embeddedWindowMs: 900 });
+    const g = gradeDiscreteChord(spec({ hand: "HT", windowMs: 5000 }), notes, { LH: "lh1", RH: "rh1", embeddedWindowMs: { LH: 900, RH: 900 } });
     expect(g.primary.rating).toBe(3);
     expect(g.embedded.get("lh1")!.clean).toBe(true);
     expect(g.embedded.get("lh1")!.inWindow).toBe(false);

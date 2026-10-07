@@ -2,7 +2,7 @@
 // one fact with the teach lighting — exact-key grading with the wrongOctave diagnosis,
 // the seeded engraving-pick grid, and F5's pulsed octave offset (03 §7's register freedom).
 import { describe, it, expect } from "vitest";
-import { chordStaffNotes, majorSigOf, knowledgeAnswerable, type ChordAtom } from "../src/core/catalog";
+import { chordStaffNotes, chordSymbol, majorSigOf, knowledgeAnswerable, type ChordAtom } from "../src/core/catalog";
 import { gradeStaffChord } from "../src/core/grader/discrete";
 import { sampleEngravingPick } from "../src/core/engravingPick";
 import { buildRun, pulsedOffset } from "../src/core/runs";
@@ -17,10 +17,10 @@ describe("chordStaffNotes (the canonical home voicing, one fact with the teach l
     expect(chordStaffNotes({ root: 0, quality: "maj", inversion: 0 }, "bass").map(x => x.midi)).toEqual([48, 52, 55]);
   });
 
-  it("spells within doubles across every scoped quality × root × inversion, ascending", () => {
+  it("spells within doubles across every quality × root × inversion, ascending (aug included)", () => {
     const LETTER_PC = [0, 2, 4, 5, 7, 9, 11];
-    for (const quality of ["maj", "min", "dim", "maj7", "dom7", "m7", "m7b5", "dim7"]) {
-      const invs = ["maj", "min", "dim"].includes(quality) ? [0, 1, 2] : [0, 1, 2, 3];
+    for (const quality of ["maj", "min", "dim", "aug", "maj7", "dom7", "m7", "m7b5", "dim7"]) {
+      const invs = ["maj", "min", "dim", "aug"].includes(quality) ? [0, 1, 2] : [0, 1, 2, 3];
       for (let root = 0 as Pc; root < 12; root++) for (const inversion of invs) {
         const notes = chordStaffNotes({ root: root as Pc, quality, inversion }, "treble");
         for (const x of notes) {
@@ -30,6 +30,20 @@ describe("chordStaffNotes (the canonical home voicing, one fact with the teach l
         for (let i = 1; i < notes.length; i++) expect(notes[i].midi).toBeGreaterThan(notes[i - 1].midi);
       }
     }
+  });
+});
+
+describe("chordSymbol slash bass (log #98: the bass spells as the CHORD spells it)", () => {
+  const sym = (root: number, quality: string, inversion: number) =>
+    chordSymbol({ family: "chord", root, quality, inversion, answer: "midi" } as never);
+  it("enharmonics follow the chord's letters, never the chromatic table", () => {
+    expect(sym(11, "maj", 1)).toBe("B/D♯");      // not B/E♭
+    expect(sym(4, "maj", 1)).toBe("E/G♯");       // not E/A♭
+    expect(sym(6, "maj", 1)).toBe("F♯/A♯");      // not F♯/B♭
+    expect(sym(1, "maj", 1)).toBe("C♯/E♯");      // not C♯/F
+    expect(sym(0, "dim", 2)).toBe("Cdim/G♭");    // not Cdim/F♯
+    expect(sym(0, "dim7", 3)).toBe("Cdim7/B𝄫"); // the double-flat is the honest spelling
+    expect(sym(0, "maj", 2)).toBe("C/G");        // naturals untouched
   });
 });
 
