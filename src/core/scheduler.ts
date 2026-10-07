@@ -29,7 +29,8 @@ export interface DrillCard {
   stepDueItems: number | null;  // area servedCount threshold (item-denominated, 04 §2)
   stepDueMs: number | null;     // the clock fallback
   fsrs: FsrsCard | null;        // null until graduation — steps live outside FSRS (04 §2)
-  tier: 0 | 1;                  // v1: 0 = learning · 1 = the fluency gate (F4: the 900ms window; F5/F6: the T4 anchor tempo, eighths at ♩=80)
+  tier: number;                 // the gate ladder rung: 0|1 for A-families (F4: the 900ms window;
+                                // F5/F6: the T4 anchor tempo) · 0–4 for F8 (the display ladder)
   gateStreak: number;           // signed: + consecutive in-window · − consecutive out (02 §1, #67)
   introducedAt: number;
   lastReviewAt: number | null;
@@ -46,6 +47,7 @@ export interface ReviewRow {
   paramGroup: "A" | "B";
   reviewedAt: number;
   instanceSeed?: string | null; // sampled-target atoms log the seed on the review (02 §1)
+  errorSummary?: unknown;       // engine B: per-instance detail for the prescriber (04 §5)
 }
 
 export function windowFor(card: DrillCard): number {
@@ -63,31 +65,37 @@ export function afterTeach(card: DrillCard): DrillCard {
 
 const toF = (r: Rating): Grade => (r === 1 ? FRating.Again : r === 2 ? FRating.Hard : FRating.Good);
 
-function applyGateStreak(card: DrillCard, res: GradeResult): DrillCard {
+function applyGateStreak(card: DrillCard, res: GradeResult, tierMax: number): DrillCard {
   // In-window at current demand extends the earn streak; wrong-or-slow extends the release streak.
   let s = res.inWindow ? (card.gateStreak >= 0 ? card.gateStreak + 1 : 1)
                        : (card.gateStreak <= 0 ? card.gateStreak - 1 : -1);
   let tier = card.tier;
-  if (s >= GATE_STREAK && tier === 0) { tier = 1; s = 0; }        // earned: demand tightens (02 §1)
-  else if (s <= -GATE_STREAK && tier === 1) { tier = 0; s = 0; }  // released: held, not owned (#67)
+  if (s >= GATE_STREAK && tier < tierMax) { tier++; s = 0; }      // earned: demand tightens (02 §1)
+  else if (s <= -GATE_STREAK && tier > 0) { tier--; s = 0; }      // released: held, not owned (#67)
   return { ...card, gateStreak: s, tier };
 }
 
 export interface AreaCtx { servedCount: number; nowMs: number; }
 
+/** One rep from completing an earn streak with a rung left to earn — the gate rep (04 §5's N=5). */
+export function gateRepPending(card: DrillCard, tierMax: number): boolean {
+  return card.step === "graduated" && card.gateStreak === GATE_STREAK - 1 && card.tier < tierMax;
+}
+
 /** Apply one graded rep of this card. Returns the new card + the review row to append. */
 export function applyRep(
   card: DrillCard, res: GradeResult, attemptId: string, ctx: AreaCtx, derived = false, parentAttemptId: string | null = null,
   gateable = true, // knowledge atoms are tierless and carry no gate (02 §1, F1 §Grading)
+  opts: { tierMax?: number; paramGroup?: "A" | "B" } = {}, // engine B: the 0–4 ladder, group B rows
 ): { card: DrillCard; row: ReviewRow } {
   const row: ReviewRow = {
     atomId: card.atomId, attemptId, rating: res.rating, latencyMs: res.latencyMs,
-    tier: card.tier, derived, parentAttemptId, paramGroup: "A", reviewedAt: ctx.nowMs,
+    tier: card.tier, derived, parentAttemptId, paramGroup: opts.paramGroup ?? "A", reviewedAt: ctx.nowMs,
   };
   let c: DrillCard = { ...card, lastReviewAt: ctx.nowMs };
   // Gates are spaced-evidence territory (02 §1, log #75): step-phase reps never arm or move
   // a gate in either direction — month-one Good stays month-one (03 §6).
-  if (gateable && card.step === "graduated") c = applyGateStreak(c, res);
+  if (gateable && card.step === "graduated") c = applyGateStreak(c, res, opts.tierMax ?? 1);
 
   const confirmDue = () => { c.step = "confirm"; c.stepDueItems = ctx.servedCount + CONFIRM_AFTER_ITEMS; c.stepDueMs = ctx.nowMs + CONFIRM_AFTER_MS; };
   const againNowDue = () => { c.step = "againNow"; c.stepDueItems = ctx.servedCount + AGAIN_NOW_AFTER_ITEMS; c.stepDueMs = ctx.nowMs + 2 * 60_000; };

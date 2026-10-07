@@ -29,6 +29,16 @@ export const READ_GATE_WINDOW_MS = 900;
 // one generous latency window until T4's speeded tier arrives.
 export const INTERVAL_WINDOW_MS = 5000;
 
+// F8 staff flash (engine B): the display ladder IS the tier ladder — each rung advance a
+// gate; displayMs is the difficulty, the answer clock never tightens (F8 §Grading).
+export const FLASH_DISPLAY_MS = [2000, 1200, 800, 600, 400] as const;
+export const FLASH_ANSWER_WINDOW_MS = 5000;
+export const FLASH_ANSWER_TIMEOUT_MS = 8000; // flashAnswerTimeoutS default — Again and move on
+export const FLASH_N = 3;                    // instances per class rep (04 §5)
+export const FLASH_N_GATE = 5;               // the rep that would complete an earn streak
+export const FLASH_KS_ENTRY_TIER = 1;        // wider-context classes admit at the 1200ms rung
+export const FLASH_RESHOW_MS = 1400;         // a missed figure re-engraves for a breath
+
 // Practice-local steps (04 §2) — item-denominated with a clock fallback.
 export const CONFIRM_AFTER_ITEMS = 20;
 export const CONFIRM_AFTER_MS = 10 * 60_000;

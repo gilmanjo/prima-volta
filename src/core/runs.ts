@@ -7,7 +7,7 @@ import type { ArpAtom, ScaleAtom, ScaleType } from "./catalog";
 /** The tempo a run card's tier demands (F5/F6 anchor notation, ruled): the learning tier
  *  puts one note per quarter click at ♩=60; the gate tier plays eighths at ♩=80. */
 export interface RunTempo { beatMs: number; notesPerBeat: number; noteMs: number; }
-export function runTempo(tier: 0 | 1): RunTempo {
+export function runTempo(tier: number): RunTempo {
   if (tier === 1) return { beatMs: RUN_GATE_BEAT_MS, notesPerBeat: RUN_GATE_NOTES_PER_BEAT, noteMs: RUN_GATE_BEAT_MS / RUN_GATE_NOTES_PER_BEAT };
   return { beatMs: RUN_BEAT_MS, notesPerBeat: 1, noteMs: RUN_BEAT_MS };
 }

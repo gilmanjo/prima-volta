@@ -16,7 +16,10 @@ export interface RefoldRow {
   reviewedAt: number;
 }
 
-export function refoldCards(rows: RefoldRow[], gateableOf: (atomId: string) => boolean): Map<string, DrillCard> {
+export function refoldCards(
+  rows: RefoldRow[], gateableOf: (atomId: string) => boolean,
+  tierMaxOf: (atomId: string) => number = () => 1, // F8 classes fold on the 0–4 display ladder
+): Map<string, DrillCard> {
   const cards = new Map<string, DrillCard>();
   const sorted = [...rows].sort((a, b) => a.reviewedAt - b.reviewedAt || (a.attemptId < b.attemptId ? -1 : 1));
   let served = 0;
@@ -26,7 +29,8 @@ export function refoldCards(rows: RefoldRow[], gateableOf: (atomId: string) => b
       rating: r.rating, latencyMs: r.latencyMs, errorEvents: [],
       clean: r.rating !== 1, inWindow: r.rating === 3,
     };
-    const { card } = applyRep(c, res, r.attemptId, { servedCount: served++, nowMs: r.reviewedAt }, r.derived, r.parentAttemptId, gateableOf(r.atomId));
+    const { card } = applyRep(c, res, r.attemptId, { servedCount: served++, nowMs: r.reviewedAt }, r.derived, r.parentAttemptId,
+      gateableOf(r.atomId), { tierMax: tierMaxOf(r.atomId) });
     cards.set(r.atomId, card);
   }
   return cards;

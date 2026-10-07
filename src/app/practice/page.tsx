@@ -7,13 +7,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Keybed, type KeyState } from "../../components/Keybed";
 import {
-  atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, keyNameOf, knowledgeAnswerable, relativeOf, sigSpelling, subsumedBy, PC_NAMES,
-  type ArpAtom, type ChordAtom, type DrillAtom, type IntervalAtom, type KeysAtom, type ReadingAtom, type ScaleAtom,
+  atomTitle, catalog, chordPcs, chordSymbol, compareAdmission, keyNameOf, knowledgeAnswerable, relativeOf, sigSpelling, subsumedBy, tierMaxOf, PC_NAMES,
+  type ArpAtom, type ChordAtom, type DrillAtom, type FlashAtom, type IntervalAtom, type KeysAtom, type ReadingAtom, type ScaleAtom,
 } from "../../core/catalog";
 import { intervalWords, sampleInterval, spellNoteName, staffSpec, type IntervalInstance } from "../../core/intervals";
 import { gradeIntervalPair } from "../../core/grader/interval";
+import { deriveInstanceSeed, flashDisplayMs, sampleFlash, type FlashInstance } from "../../core/flash";
+import { aggregateFlashRep, gradeFlashInstance } from "../../core/grader/flash";
 import { IntervalSelector } from "../../components/IntervalSelector";
-import { sampleReading, spellSounding, type ReadingInstance } from "../../core/reading";
+import { sampleReading, spellSounding, LETTER_PC, type ReadingInstance } from "../../core/reading";
 import { gradeSingleNote } from "../../core/grader/note";
 import { StaffView } from "../../components/StaffView";
 import { NoteSelector } from "../../components/NoteSelector";
@@ -25,21 +27,25 @@ import { next as fillerNext, noteServed, type FillerState } from "../../core/fil
 import { gradeDiscreteChord } from "../../core/grader/discrete";
 import { runLabels } from "../../core/fingering";
 import { anchorOffset, buildRun, runTempo, selfPacedRunResult, type Run } from "../../core/runs";
-import { afterTeach, applyDerived, applyRep, windowFor, type DrillCard } from "../../core/scheduler";
+import { afterTeach, applyDerived, applyRep, gateRepPending, windowFor, type DrillCard } from "../../core/scheduler";
 import { ulid } from "../../core/ulid";
 import type { GradeResult, NoteEvent, Pc } from "../../core/types";
-import { CHORD_SPREAD_MS, INTERVAL_WINDOW_MS, KNOWLEDGE_WINDOW_MS, READ_GATE_WINDOW_MS, READ_LEARN_WINDOW_MS, spellWindowMs } from "../../core/constants";
+import {
+  CHORD_SPREAD_MS, FLASH_ANSWER_TIMEOUT_MS, FLASH_ANSWER_WINDOW_MS, FLASH_N, FLASH_N_GATE,
+  FLASH_RESHOW_MS, INTERVAL_WINDOW_MS, KNOWLEDGE_WINDOW_MS, READ_GATE_WINDOW_MS,
+  READ_LEARN_WINDOW_MS, spellWindowMs,
+} from "../../core/constants";
 import { STARTER_TEMPLATE, type PracticeTemplate, type TemplateBlock } from "../../core/template";
 import { defaultProfile, initMidi, onNote, onNoteOff } from "../../services/midi";
 import { ensureAudio, ui } from "../../services/uiAudio";
 import { refoldCards } from "../../core/refold";
 import { appendAttempt, appendReview, attachBoutProfile, loadCards, loadProfile, pullReplica, pushOutbox, saveCard, touchBout } from "../../services/store";
 
-type Phase = "init" | "teach" | "prompt" | "reconcile" | "good" | "next" | "interstitial" | "done" | "polishing" | "unavailable";
+type Phase = "init" | "teach" | "flash" | "prompt" | "reconcile" | "good" | "next" | "interstitial" | "done" | "polishing" | "unavailable";
 const RECONCILE_ARM_MS = 600; // the settle-beat: the failed take's tail never bleeds in (U2)
 
-type Family = "chord" | "scale" | "arp" | "keys" | "reading" | "interval" | "free";
-const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures", reading: "Note reading", interval: "Intervals", free: "Free roam" };
+type Family = "chord" | "scale" | "arp" | "keys" | "reading" | "interval" | "flash" | "free";
+const FAMILY_TITLE: Record<Family, string> = { chord: "Chords", scale: "Scales", arp: "Arpeggios", keys: "Keys & signatures", reading: "Note reading", interval: "Intervals", flash: "Staff flash", free: "Free roam" };
 
 const CHORD_POOL: ChordAtom[] = (catalog.defaults("chord") as ChordAtom[])
   .filter(a => !a.stream && (a.answer === "midi" ? a.cue === "name" && a.form === "blocked" : a.answer === "spell"))
@@ -56,8 +62,10 @@ function poolFor(f: Family): DrillAtom[] {
     return (catalog.defaults("reading") as ReadingAtom[]).sort(compareAdmission);
   if (f === "interval")
     return (catalog.defaults("interval") as IntervalAtom[]).sort(compareAdmission);
+  if (f === "flash")
+    return (catalog.defaults("flash") as FlashAtom[]).sort(compareAdmission);
   if (f === "free") // U1's ruled free roam: the weakest-first everything-in-scope mix
-    return [...poolFor("keys"), ...CHORD_POOL, ...poolFor("scale"), ...poolFor("arp"), ...poolFor("reading"), ...poolFor("interval")].sort(compareAdmission);
+    return [...poolFor("keys"), ...CHORD_POOL, ...poolFor("scale"), ...poolFor("arp"), ...poolFor("reading"), ...poolFor("interval"), ...poolFor("flash")].sort(compareAdmission);
   return CHORD_POOL;
 }
 
@@ -81,6 +89,7 @@ const isSpellAtom = (a: DrillAtom): a is ChordAtom & { answer: "spell" } =>
   a.family === "chord" && a.answer === "spell";
 const isReadingAtom = (a: DrillAtom): a is ReadingAtom => a.family === "reading";
 const isIntervalAtom = (a: DrillAtom): a is IntervalAtom => a.family === "interval";
+const isFlashAtom = (a: DrillAtom): a is FlashAtom => a.family === "flash";
 
 /** Confirmation copy (F1 §Variants): sig→key reveals the relative pairing (and the ±6
  *  enharmonic); key→sig spells the accidentals in order. */
@@ -104,6 +113,9 @@ export default function Practice() {
   const [picks, setPicks] = useState<Record<number, PickState>>({});
   const [inst, setInst] = useState<ReadingInstance | null>(null);
   const [ivInst, setIvInst] = useState<IntervalInstance | null>(null);
+  const [flInst, setFlInst] = useState<FlashInstance | null>(null);
+  const [flashProg, setFlashProg] = useState<[number, number] | null>(null); // instance i/N in the strip
+  const [verdictBad, setVerdictBad] = useState(false); // a non-blocking Again verdict reads felt-red
   const [doubles, setDoubles] = useState(false);
 
   const S = useRef<{
@@ -118,6 +130,8 @@ export default function Practice() {
     teachSlot: number; teachHit: Set<number>; baseKeys: Record<number, KeyState>;
     readingInst: ReadingInstance | null; readingSeed: number; hasDevice: boolean;
     ivInst: IntervalInstance | null; ivSeed: number;
+    flashInst: FlashInstance | null; flashRepSeed: number; flashI: number; flashCount: number;
+    flashResults: GradeResult[]; flashBlankAt: number; flashPos: number; flashTimer: number | null; flashNoteStart: number;
   }>({
     filler: { cards: new Map(), recentServed: [], admittedThisWindow: [] }, pool: CHORD_POOL, served: 0,
     profileId: null, profileLatencyMs: 0, profileJitterMs: 25,
@@ -127,6 +141,7 @@ export default function Practice() {
     run: null, runNoteMs: 1000, runPos: 0, runSlotHit: new Set(), runOnsets: [], runOffset: 0, teachSlot: 0, teachHit: new Set(), baseKeys: {},
     readingInst: null, readingSeed: 0, hasDevice: false,
     ivInst: null, ivSeed: 0,
+    flashInst: null, flashRepSeed: 0, flashI: 0, flashCount: FLASH_N, flashResults: [], flashBlankAt: 0, flashPos: 0, flashTimer: null, flashNoteStart: 0,
   });
 
   const phaseRef = useRef<Phase>("init");
@@ -140,7 +155,7 @@ export default function Practice() {
 
   const expectedKeyStates = useCallback((a: DrillAtom, state: KeyState): Record<number, KeyState> => {
     const out: Record<number, KeyState> = {};
-    if (isKeysAtom(a) || isReadingAtom(a) || isIntervalAtom(a)) return out; // lit inline or on widgets
+    if (isKeysAtom(a) || isReadingAtom(a) || isIntervalAtom(a) || isFlashAtom(a)) return out; // lit inline or on widgets
     if (isRunAtom(a)) {
       for (const m of buildRun(a).pathMidis) out[m] = state;
       return out;
@@ -157,6 +172,9 @@ export default function Practice() {
     else stack(a.hand === "LH" ? 48 : 60);
     return out;
   }, []);
+
+  // F8's machine is reached from serve() (declared before its parts) through a stable ref
+  const flashM = useRef<{ begin: () => void; finish: () => void }>({ begin: () => {}, finish: () => {} });
 
   const serve = useCallback(() => {
     const st = S.current;
@@ -190,6 +208,32 @@ export default function Practice() {
     setPicks({});
     setInst(null);
     setIvInst(null);
+    setFlInst(null);
+    setFlashProg(null);
+    setVerdictBad(false);
+    if (st.flashTimer !== null) { clearTimeout(st.flashTimer); st.flashTimer = null; }
+    if (isFlashAtom(res.atom)) {
+      // engine B (04 §5): one rep = N fresh instances off one rep seed; the rep that would
+      // complete a gate's earn streak serves five — the perfect-practice bar (F8 §Mechanics)
+      st.flashRepSeed = Math.floor(Math.random() * 2 ** 31);
+      st.flashI = 0;
+      st.flashResults = [];
+      st.flashCount = res.kind === "teach" ? 1 : gateRepPending(res.card, tierMaxOf(res.atom)) ? FLASH_N_GATE : FLASH_N;
+      if (res.kind === "teach") {
+        const fin = sampleFlash(res.atom, res.card.tier, deriveInstanceSeed(st.flashRepSeed, 0));
+        st.flashInst = fin;
+        setFlInst(fin);
+        st.teachSlot = 0; st.teachHit = new Set();
+        const base: Record<number, KeyState> = Object.fromEntries(fin.notes.map(n => [n.midi, "exp" as KeyState]));
+        st.baseKeys = base;
+        setKeys(base);
+        setPhase("teach");
+      } else {
+        st.baseKeys = {};
+        flashM.current.begin();
+      }
+      return;
+    }
     if (isIntervalAtom(res.atom)) {
       // engine-A sampled anchors (F3 §Grading): the card's tier IS the anchor pool —
       // tier 0 white keys with the anchor highlighted, tier 1 all twelve from memory
@@ -362,6 +406,97 @@ export default function Practice() {
       if (++st.sinceSync >= 8) { st.sinceSync = 0; void pushOutbox(); }
     })();
   }, []);
+
+  // ---- F8 staff flash (F8 §Mechanics · 04 §5): N instances per class rep ----
+
+  /** Aggregate the rep, write its ONE review row (group B, rep seed, per-instance detail). */
+  const finalizeFlashRep = useCallback((a: FlashAtom) => {
+    const st = S.current;
+    const agg = aggregateFlashRep(st.flashResults);
+    const attemptId = ulid();
+    const nowMs = Date.now();
+    const perInstance = st.flashResults.map(r => ({
+      rating: r.rating, latencyMs: r.latencyMs,
+      errors: r.errorEvents.map(e => ({ type: e.type, tags: e.tags })),
+    }));
+    const { card: after, row } = applyRep(st.card!, agg, attemptId, { servedCount: st.served, nowMs },
+      false, null, true, { tierMax: tierMaxOf(a), paramGroup: "B" });
+    st.filler.cards.set(a.id, after);
+    void saveCard(after);
+    logAttempt(a, attemptId, nowMs,
+      { rating: agg.rating, latencyMs: agg.latencyMs, errors: agg.errorEvents.length, instances: perInstance, repSeed: String(st.flashRepSeed) },
+      undefined, String(st.flashRepSeed));
+    void appendReview({ id: ulid(), ...row, instanceSeed: String(st.flashRepSeed), errorSummary: perInstance });
+    setFlashProg(null);
+    const flawed = st.flashResults.filter(r => r.rating !== 3);
+    if (agg.rating === 1) {
+      ui.err();
+      setVerdictBad(true);
+      setFeedback(`${atomTitle(a)} · ${flawed.length} of ${st.flashResults.length} missed · Again`);
+    } else if (agg.rating === 2) {
+      ui.hard();
+      setFeedback(`${atomTitle(a)} · one ${flawed[0]?.clean ? "slow" : "missed"} of ${st.flashResults.length} · Hard`);
+    } else {
+      ui.good();
+      setFeedback(`${atomTitle(a)} · ${((agg.latencyMs ?? 0) / 1000).toFixed(1)}s avg / ${(FLASH_ANSWER_WINDOW_MS / 1000).toFixed(1)}s · Good`);
+    }
+    setPhase("good");
+    advance(agg.rating === 3 ? 900 : 1500);
+  }, [advance, logAttempt]);
+
+  /** Show instance i: the figure for the tier's displayMs, then the blank + answer timeout. */
+  const beginFlashInstance = useCallback(() => {
+    const st = S.current;
+    const a = atomRef.current;
+    if (!a || !isFlashAtom(a)) return;
+    const fin = sampleFlash(a, st.card!.tier, deriveInstanceSeed(st.flashRepSeed, st.flashI));
+    st.flashInst = fin;
+    setFlInst(fin);
+    setFlashProg([st.flashI + 1, st.flashCount]);
+    st.flashPos = 0;
+    st.matched = new Set();
+    st.flashNoteStart = st.collected.length; // the rep's raw stream accumulates; grade the slice
+    setKeys({});
+    setFeedback("");
+    setPhase("flash");
+    if (st.flashTimer !== null) clearTimeout(st.flashTimer);
+    st.flashTimer = window.setTimeout(() => {
+      setPhase("prompt"); // the blank — play from memory
+      st.flashBlankAt = performance.now();
+      st.flashTimer = window.setTimeout(() => flashM.current.finish(), FLASH_ANSWER_TIMEOUT_MS);
+    }, flashDisplayMs(st.card!.tier));
+  }, []);
+
+  /** Instance done (completed, failed, or timed out): rate it; a miss re-engraves for a
+   *  breath (the staff was blank when it happened — F8 §Grading), then the next instance. */
+  const finishFlashInstance = useCallback(() => {
+    const st = S.current;
+    const a = atomRef.current;
+    if (!a || !isFlashAtom(a) || phaseRef.current !== "prompt") return; // timer/walker double-fire guard
+    if (st.flashTimer !== null) { clearTimeout(st.flashTimer); st.flashTimer = null; }
+    const fin = st.flashInst!;
+    const res = gradeFlashInstance({
+      expected: fin.notes.map(n => ({ midi: n.midi, naturalMidi: 12 * (n.octave + 1) + LETTER_PC[n.letter] })),
+      chord: fin.chord, windowMs: FLASH_ANSWER_WINDOW_MS, blankAtMs: st.flashBlankAt, keyLabel: fin.keyLabel,
+    }, st.collected.slice(st.flashNoteStart));
+    st.flashResults.push(res);
+    const next = () => {
+      st.flashI++;
+      if (st.flashI < st.flashCount) flashM.current.begin();
+      else finalizeFlashRep(a);
+    };
+    if (res.rating === 1) {
+      ui.err();
+      setPhase("flash"); // the re-show
+      setFeedback(`Expected ${fin.notes.map(n => spellSounding(n.letter, n.octave, null, fin.sig)).join(" · ")}`);
+      st.flashTimer = window.setTimeout(() => { setFeedback(""); next(); }, FLASH_RESHOW_MS);
+    } else {
+      next();
+    }
+  }, [finalizeFlashRep]);
+
+  flashM.current.begin = beginFlashInstance;
+  flashM.current.finish = finishFlashInstance;
 
   /** F2 staff→midi: the first key answers — octave-strict, sounding pitch (F𝄪4 accepts G4's key). */
   const finalizeReading = useCallback((a: ReadingAtom, note: NoteEvent) => {
@@ -773,6 +908,53 @@ export default function Practice() {
       if (st.matched.size >= 2) { st.finalized = true; finalizeInterval(a); }
       return;
     }
+    if (isFlashAtom(a)) {
+      const fin = st.flashInst;
+      if (!fin) return;
+      if (ph === "teach") {
+        // play the figure once (U2 §Teach, the play shape) — walk its events in order
+        const slots = fin.chord ? [fin.notes.map(x => x.midi)] : fin.notes.map(x => [x.midi]);
+        const slot = slots[st.teachSlot];
+        if (!slot || !slot.includes(n.midi) || st.teachHit.has(n.midi)) return;
+        st.teachHit.add(n.midi);
+        setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        if (st.teachHit.size >= slot.length) {
+          st.teachSlot++; st.teachHit = new Set();
+          if (st.teachSlot >= slots.length) {
+            const taught = afterTeach(st.card!);
+            st.filler.cards.set(a.id, taught);
+            void saveCard(taught);
+            advance(300);
+          }
+        }
+        return;
+      }
+      if (ph !== "prompt") return; // input during the flash itself waits for the blank
+      st.collected.push({ midi: n.midi, onMs: n.onMs, vel: n.vel });
+      if (fin.chord) {
+        if (st.matched.has(n.midi)) return; // retrigger of a held key — chatter (03 §7)
+        if (!fin.notes.some(x => x.midi === n.midi)) {
+          setKeys(k => ({ ...k, [n.midi]: "err" }));
+          flashM.current.finish();
+          return;
+        }
+        st.matched.add(n.midi);
+        setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        if (st.matched.size >= fin.notes.length) flashM.current.finish();
+        return;
+      }
+      // the sequence walker: order-strict; a repeat of the just-played key is chatter (03 §7)
+      if (st.flashPos > 0 && n.midi === fin.notes[st.flashPos - 1].midi) return;
+      if (n.midi === fin.notes[st.flashPos]?.midi) {
+        st.flashPos++;
+        setKeys(k => ({ ...k, [n.midi]: "ok" }));
+        if (st.flashPos >= fin.notes.length) flashM.current.finish();
+      } else {
+        setKeys(k => ({ ...k, [n.midi]: "err" }));
+        flashM.current.finish();
+      }
+      return;
+    }
     if (isReadingAtom(a)) {
       if (a.answer !== "midi") return; // the selector variant answers on the widget
       const inst = st.readingInst!;
@@ -958,7 +1140,7 @@ export default function Practice() {
     document.addEventListener("pointerdown", arm);
     const params = new URLSearchParams(window.location.search);
     const f = params.get("family");
-    const fam: Family = f === "scale" || f === "arp" || f === "keys" || f === "reading" || f === "interval" || f === "free" ? f : "chord";
+    const fam: Family = f === "scale" || f === "arp" || f === "keys" || f === "reading" || f === "interval" || f === "flash" || f === "free" ? f : "chord";
     S.current.pool = poolFor(fam);
     setFamily(fam);
     if (params.get("template") === "starter") S.current.template = STARTER_TEMPLATE;
@@ -972,6 +1154,9 @@ export default function Practice() {
           if (!a) return true;
           // knowledge atoms are tierless — no gate (02 §1)
           return !(knowledgeAnswerable(a) || (a.family === "chord" && a.answer !== "midi"));
+        }, id => {
+          const a = catalog.byId(id) as DrillAtom | undefined;
+          return a ? tierMaxOf(a) : 1; // flash classes fold on the 0–4 display ladder
         }));
         if (pulled > 0) cards = await loadCards();
         if (!alive) return;
@@ -1031,6 +1216,7 @@ export default function Practice() {
   const isReadSel = isReading && (atom as ReadingAtom).answer === "selector";
   const isInterval = atom !== null && isIntervalAtom(atom);
   const isIvSel = isInterval && (atom as IntervalAtom).answer === "selector";
+  const isFlash = atom !== null && isFlashAtom(atom);
   // choice-answer teach: named result, inert widget, any tap continues (U2 §Teach) —
   // played keys may still walk the revealed tones instead (spell's at-instrument ack)
   const choiceTeach = phase === "teach" && (isKeys || isReadSel || isIvSel || isSpell);
@@ -1042,6 +1228,7 @@ export default function Practice() {
     : isIntervalAtom(atom) ? (atom.cue === "name"
         ? [`from ${ivInst ? spellNoteName(ivInst.anchor) : "…"}`, `${atom.hand}${atom.form === "harmonic" ? " · together" : ""}`]
         : [`${atom.clef} clef`, atom.answer === "midi" ? "play it" : "name it"])
+    : isFlashAtom(atom) ? [`${flInst?.clef ?? "treble"} clef`, phase === "prompt" ? "play it from memory" : "read the figure"]
     : isSpellAtom(atom) ? ["spell it", device ? "play or tap · any octave" : "any octave"]
     : isRunAtom(atom) ? [atom.hand as string, atom.family === "scale" ? "1 octave · up and down" : "up and down"]
     : [atom.hand as string, atom.form as string];
@@ -1050,7 +1237,7 @@ export default function Practice() {
     <main className="flex h-dvh flex-col">
       <header className="flex items-center gap-2 px-4 py-2 text-[11px] uppercase tracking-wide text-[var(--ink2)]">
         <Link href="/" className="mr-1">←</Link>
-        <span>{tplBlock ? tplBlock.name : FAMILY_TITLE[family]}</span>
+        <span>{tplBlock ? tplBlock.name : FAMILY_TITLE[family]}{flashProg ? ` · ${flashProg[0]}/${flashProg[1]}` : ""}</span>
         <span className="ml-auto rounded-full border border-[var(--border)] px-2 py-0.5 normal-case tracking-normal text-[var(--ink)]">
           {phase === "teach" ? "Teach" : "Rehearsal"}
         </span>
@@ -1067,7 +1254,7 @@ export default function Practice() {
             <span className="ml-2 text-[var(--accent-hi)]">check again</span>
           </button>
         )}
-        {(phase === "teach" || phase === "prompt" || phase === "reconcile" || phase === "good" || phase === "next") && atom && (
+        {(phase === "teach" || phase === "flash" || phase === "prompt" || phase === "reconcile" || phase === "good" || phase === "next") && atom && (
           <div className={`flex w-full items-end justify-between gap-6 transition-opacity duration-200 ease-out ${phase === "next" ? "opacity-0" : "opacity-100"}`}>
             <div>
               {isKeysAtom(atom) && atom.dir === "sigToKey"
@@ -1078,6 +1265,10 @@ export default function Practice() {
                 ? <div className="h-36 w-80 max-w-[64vw]"><StaffView clef={atom.clef === "bass" ? "bass" : "treble"} {...staffSpec(ivInst.anchor)} second={staffSpec(ivInst.target)} form={atom.form} /></div>
                 : isIntervalAtom(atom) && ivInst
                 ? <div className="font-serif text-6xl leading-none">{ivInst.label} {atom.dir === "down" ? "↓" : "↑"}</div>
+                : isFlashAtom(atom) && flInst
+                ? <div className="h-36 w-80 max-w-[64vw]"><StaffView clef={flInst.clef} sig={flInst.sig}
+                    measure={{ time: flInst.time, durs: flInst.durs, chord: flInst.chord,
+                      notes: phase === "prompt" ? [] : flInst.notes.map(x => ({ letter: x.letter, octave: x.octave })) }} /></div>
                 : <div className="font-serif text-6xl leading-none">{atomTitle(atom)}</div>}
               <div className="mt-2 text-[16px]">
                 <span className="text-[var(--ink)]">{subParts![0]}</span>
@@ -1091,10 +1282,14 @@ export default function Practice() {
                   {choiceTeach ? <>{feedback} · <span className="text-[var(--accent-hi)]">{isSpell && device ? "play them — or tap to continue" : "tap to continue"}</span></>
                     : isReading ? `${feedback} — play it`
                     : isInterval ? feedback
+                    : isFlash ? "Ungraded — play the figure once"
                     : isRun ? "Ungraded — walk the path, bottom up" : "Ungraded — take your time"}
                 </p>
               )}
-              {phase === "good" && <p className="text-[14px] text-[var(--good)]">{feedback}</p>}
+              {phase === "flash" && feedback !== "" && (
+                <p className="max-w-72 text-[14px] text-[var(--felt)]">{feedback}</p>
+              )}
+              {phase === "good" && <p className={`text-[14px] ${verdictBad ? "text-[var(--felt)]" : "text-[var(--good)]"}`}>{feedback}</p>}
               {phase === "reconcile" && (
                 <button onClick={() => advance(0)} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-left text-[14px] leading-relaxed text-[var(--ink)]">
                   <span className="text-[var(--felt)]">{feedback}</span>

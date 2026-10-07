@@ -71,7 +71,7 @@ function targetFrom(anchor: SpelledNote, steps: number, semis: number, dirUp: bo
   return spell(letter, octave, inline);
 }
 
-export function sampleInterval(a: IntervalAtom, tier: 0 | 1, seed: number): IntervalInstance {
+export function sampleInterval(a: IntervalAtom, tier: number, seed: number): IntervalInstance {
   const rnd = mulberry32(seed);
   const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)];
   const { size, quality, steps } = kindParts(a.kind, a.kind === "TT" ? rnd() < 0.5 : false);

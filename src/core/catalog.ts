@@ -60,8 +60,15 @@ export interface IntervalAtom extends CatalogAtom {
   answer: "midi" | "selector";
 }
 
+export interface FlashAtom extends CatalogAtom {
+  family: "flash";
+  pattern: string;                    // second…sixth | triadShape | scaleFragment | brokenChord | cadence
+  clef: "treble" | "bass" | "grand";  // grand = the figure appears in either staff
+  keyContext: "open" | "ks12" | "ksAll";
+}
+
 /** The playable-atom union the filler and player serve. */
-export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom | KeysAtom | ReadingAtom | IntervalAtom;
+export type DrillAtom = ChordAtom | ScaleAtom | ArpAtom | KeysAtom | ReadingAtom | IntervalAtom | FlashAtom;
 
 const atoms = (catalogJson as { atoms: CatalogAtom[] }).atoms;
 const byId = new Map(atoms.map(a => [a.id, a]));
@@ -151,7 +158,20 @@ export function intervalAdmissionKey(a: IntervalAtom): number[] {
   ];
 }
 
-const FAMILY_ORDER: Record<string, number> = { keys: 0, chord: 1, scale: 2, arp: 3, reading: 4, interval: 5 };
+// F8 admission: the Piano Safari intervallic sequence (2nds → 3rds → 5THS → 4ths → 6ths),
+// then the shape families in their own order (F8 §Mechanics).
+const FLASH_PATTERN_ORDER = ["second", "third", "fifth", "fourth", "sixth", "triadShape", "scaleFragment", "brokenChord", "cadence"];
+
+/** Admission key for F8 classes: pattern (PS order) × keyContext × clef. */
+export function flashAdmissionKey(a: FlashAtom): number[] {
+  return [
+    FLASH_PATTERN_ORDER.indexOf(a.pattern),
+    a.keyContext === "open" ? 0 : a.keyContext === "ks12" ? 1 : 2,
+    a.clef === "treble" ? 0 : a.clef === "bass" ? 1 : 2,
+  ];
+}
+
+const FAMILY_ORDER: Record<string, number> = { keys: 0, chord: 1, scale: 2, arp: 3, reading: 4, interval: 5, flash: 6 };
 
 function admissionKey(a: DrillAtom): number[] {
   const fam = FAMILY_ORDER[a.family] ?? 9;
@@ -160,6 +180,7 @@ function admissionKey(a: DrillAtom): number[] {
   if (a.family === "arp") return [fam, ...arpAdmissionKey(a)];
   if (a.family === "reading") return [fam, ...readingAdmissionKey(a)];
   if (a.family === "interval") return [fam, ...intervalAdmissionKey(a)];
+  if (a.family === "flash") return [fam, ...flashAdmissionKey(a)];
   return [fam, ...chordAdmissionKey(a)];
 }
 
@@ -179,6 +200,7 @@ export function identityOf(a: DrillAtom): { root: unknown; quality: unknown } {
   if (a.family === "arp") return { root: a.root, quality: a.basis };
   if (a.family === "reading") return { root: a.band, quality: `${a.keyContext}·${a.accidental}` };
   if (a.family === "interval") return { root: a.kind, quality: a.form };
+  if (a.family === "flash") return { root: a.pattern, quality: a.keyContext };
   return { root: a.root, quality: a.quality };
 }
 
@@ -260,6 +282,17 @@ export function knowledgeAnswerable(a: DrillAtom): boolean {
     || (a.family === "interval" && a.answer === "selector");
 }
 
+// plain words for the flash families (the mockup's status-strip vocabulary)
+const FLASH_PATTERN_TITLE: Record<string, string> = {
+  second: "2nds", third: "3rds", fourth: "4ths", fifth: "5ths", sixth: "6ths",
+  triadShape: "triad shapes", scaleFragment: "scale fragments", brokenChord: "broken chords", cadence: "cadences",
+};
+
+/** The gate-ladder depth per atom (04 §5/F8): flash classes climb the 0–4 display ladder. */
+export function tierMaxOf(a: DrillAtom): number {
+  return a.family === "flash" ? 4 : 1;
+}
+
 /** The prompt title, per family — plain words, never model nouns (hub rule). */
 export function atomTitle(a: DrillAtom): string {
   if (a.family === "keys") return keyNameOf(a.sig, a.mode);
@@ -267,6 +300,7 @@ export function atomTitle(a: DrillAtom): string {
   if (a.family === "arp") return `${PC_NAMES[a.root]} ${ARP_LABEL[a.basis]} arpeggio`;
   if (a.family === "reading") return "Read the note"; // the engraving IS the prompt
   if (a.family === "interval") return a.kind === "TT" ? "the tritone" : a.kind; // the page shows the instance's label
+  if (a.family === "flash") return FLASH_PATTERN_TITLE[a.pattern] ?? a.pattern;
   return chordSymbol(a);
 }
 

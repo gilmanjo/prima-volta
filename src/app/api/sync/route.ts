@@ -65,7 +65,9 @@ export async function POST(req: Request): Promise<Response> {
       rating: Number(r.rating), latencyMs: r.latencyMs == null ? null : Number(r.latencyMs),
       tier: Number(r.tier ?? 0), derived: Boolean(r.derived),
       parentAttemptId: (r.parentAttemptId as string) ?? null, instanceSeed: (r.instanceSeed as string) ?? null,
-      errorSummaryJson: null, paramGroup: "A", reviewedAt: Number(r.reviewedAt ?? 0),
+      errorSummaryJson: r.errorSummary === undefined ? null : JSON.stringify(r.errorSummary),
+      paramGroup: r.paramGroup === "B" ? "B" : "A", // engine-B classes fit separately (04 §7)
+      reviewedAt: Number(r.reviewedAt ?? 0),
     }).onConflictDoNothing();
   }
   return Response.json({ ok: true });

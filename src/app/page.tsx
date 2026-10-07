@@ -17,6 +17,7 @@ const FAMILIES: { name: string; sub: string; href?: string; offline?: boolean }[
   { name: "Chords", sub: "triads and tetrads", href: "/practice?family=chord", offline: true },
   { name: "Scales", sub: "major, minor, etc.", href: "/practice?family=scale" },
   { name: "Arpeggios", sub: "broken chord sequences", href: "/practice?family=arp" },
+  { name: "Staff flash", sub: "read figures at a glance", href: "/practice?family=flash" },
 ];
 
 export default function Home() {
